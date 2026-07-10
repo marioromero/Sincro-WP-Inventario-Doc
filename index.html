@@ -380,6 +380,439 @@ class LocalLicenseStub implements LicenseValidator
       </div>
     </article>
 
+    <!-- 2.5 Diccionario de Datos -->
+    <article class="page" id="arquitectura-diccionario">
+      <div class="section-id">02 · Arquitectura</div>
+      <h2>Diccionario de Datos — MariaDB</h2>
+      <p class="lead">Especificación completa tabla por tabla: tipo MariaDB, nulabilidad, claves e índices, y explicación funcional. Traducible 1:1 a migraciones de Laravel.</p>
+
+      <div class="info-box">
+        <strong>Convenciones generales:</strong> Motor InnoDB en todas las tablas. Charset <code>utf8mb4</code> / <code>utf8mb4_unicode_ci</code>. Nombres en snake_case plural español. PK siempre <code>id BIGINT UNSIGNED AUTO_INCREMENT</code> salvo pivotes compuestas. Timestamps <code>created_at</code>/<code>updated_at</code> gestionados por Laravel. Booleanos como <code>TINYINT(1) UNSIGNED</code>. Dinero como <code>DECIMAL(12,2)</code>. Stock como <code>DECIMAL(12,3)</code>. Campos cifrados como <code>VARCHAR(255)</code> con cifrado a nivel de aplicación (Laravel Crypt). FK con política <code>RESTRICT</code> priorizada para preservar trazabilidad histórica.
+      </div>
+
+      <h3>1. Configuración e instalación</h3>
+
+      <h4>1.1 configuracion_sistema</h4>
+      <p>Parámetros clave-valor de la instalación (modo enrutamiento, sucursal default, frecuencia reconciliación, etc.).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>clave</td><td>VARCHAR(100)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Nombre único del parámetro</td></tr>
+        <tr><td>valor</td><td>TEXT</td><td>Sí</td><td>NULL</td><td>—</td><td>Valor del parámetro (texto o JSON)</td></tr>
+        <tr><td>tipo_dato</td><td>ENUM('string','int','bool','json')</td><td>No</td><td>'string'</td><td>—</td><td>Ayuda a castear el valor</td></tr>
+        <tr><td>descripcion</td><td>VARCHAR(255)</td><td>Sí</td><td>NULL</td><td>—</td><td>Explicación legible</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps de Laravel</td></tr>
+      </table>
+
+      <h4>1.2 licencia_estado</h4>
+      <p>Cache local del estado de licencia (simulado por el stub en MVP, real desde API en futuro).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>llave_instalacion</td><td>VARCHAR(100)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Token único de instalación</td></tr>
+        <tr><td>estado</td><td>ENUM('activo','por_vencer','suspendido')</td><td>No</td><td>'activo'</td><td>INDEX</td><td>Estado de licencia</td></tr>
+        <tr><td>fecha_vencimiento</td><td>DATE</td><td>Sí</td><td>NULL</td><td>—</td><td>Vencimiento de licencia</td></tr>
+        <tr><td>mensaje</td><td>VARCHAR(255)</td><td>Sí</td><td>NULL</td><td>—</td><td>Mensaje devuelto por API o stub</td></tr>
+        <tr><td>es_simulado</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>—</td><td>1 = stub local, 0 = API real</td></tr>
+        <tr><td>ultima_verificacion_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Última consulta a licencia</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+      </table>
+
+      <h3>2. Organización, sucursales y usuarios</h3>
+
+      <h4>2.1 sucursales</h4>
+      <p>Cada punto de venta físico o virtual de la instalación.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>nombre</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>—</td><td>Nombre visible</td></tr>
+        <tr><td>codigo</td><td>VARCHAR(30)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Código corto interno (ej. SUC-01)</td></tr>
+        <tr><td>direccion</td><td>VARCHAR(255)</td><td>Sí</td><td>NULL</td><td>—</td><td>Dirección física</td></tr>
+        <tr><td>comuna</td><td>VARCHAR(100)</td><td>Sí</td><td>NULL</td><td>INDEX</td><td>Comuna (para futuro enrutamiento)</td></tr>
+        <tr><td>es_virtual</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>0</td><td>—</td><td>1 = bodega online sin atención presencial</td></tr>
+        <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Si está operativa</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+        <tr><td>deleted_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Soft delete</td></tr>
+      </table>
+
+      <h4>2.2 roles</h4>
+      <p>Catálogo de roles con nivel jerárquico para permisos acumulativos.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>nombre</td><td>VARCHAR(50)</td><td>No</td><td>—</td><td>UNIQUE</td><td>cajero, supervisor, admin_central</td></tr>
+        <tr><td>nivel_jerarquico</td><td>TINYINT UNSIGNED</td><td>No</td><td>—</td><td>INDEX</td><td>1, 2, 3 para permisos acumulativos</td></tr>
+        <tr><td>descripcion</td><td>VARCHAR(255)</td><td>Sí</td><td>NULL</td><td>—</td><td>Descripción del rol</td></tr>
+      </table>
+
+      <h4>2.3 usuarios</h4>
+      <p>Usuarios del sistema (empleados que operan el POS o administran).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>rol_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → roles.id (RESTRICT)</td><td>Rol asignado</td></tr>
+        <tr><td>nombre</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>—</td><td>Nombre completo</td></tr>
+        <tr><td>email</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Correo para login</td></tr>
+        <tr><td>password</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>—</td><td>Hash bcrypt/argon2</td></tr>
+        <tr><td>acceso_todas_sucursales</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>0</td><td>—</td><td>1 para admin central</td></tr>
+        <tr><td>activo</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Si puede autenticarse</td></tr>
+        <tr><td>ultimo_login_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Último acceso</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+        <tr><td>deleted_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Soft delete</td></tr>
+      </table>
+
+      <h4>2.4 usuario_sucursal (pivote)</h4>
+      <p>Relación N:M: a qué sucursales tiene acceso cada usuario.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>usuario_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>PK compuesta, FK → usuarios.id (CASCADE)</td><td>Usuario</td></tr>
+        <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>PK compuesta, FK → sucursales.id (CASCADE)</td><td>Sucursal</td></tr>
+      </table>
+
+      <h3>3. Canales de venta (WooCommerce)</h3>
+
+      <h4>3.1 tiendas</h4>
+      <p>Cada sitio WooCommerce conectado (modelo multi-tienda).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>nombre</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>—</td><td>Nombre identificador</td></tr>
+        <tr><td>url_base</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>UNIQUE</td><td>URL del WordPress/WooCommerce</td></tr>
+        <tr><td>consumer_key</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>—</td><td>API Key (cifrada app)</td></tr>
+        <tr><td>consumer_secret</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>—</td><td>API Secret (cifrada app)</td></tr>
+        <tr><td>webhook_secret</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>—</td><td>Secreto webhook (cifrada app)</td></tr>
+        <tr><td>modo_enrutamiento_despacho</td><td>ENUM('fijo','manual')</td><td>No</td><td>'fijo'</td><td>—</td><td>Modo A (fijo) o B (manual)</td></tr>
+        <tr><td>sucursal_despacho_default_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → sucursales.id (SET NULL)</td><td>Sucursal default si modo fijo</td></tr>
+        <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Si la sincronización está habilitada</td></tr>
+        <tr><td>ultima_sincronizacion_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Última sync exitosa</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+      </table>
+
+      <h3>4. Catálogo</h3>
+
+      <h4>4.1 categorias</h4>
+      <p>Categorías de producto (fuente interna, mapeadas a WooCommerce).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>categoria_padre_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → categorias.id (RESTRICT)</td><td>Soporta subcategorías</td></tr>
+        <tr><td>nombre</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>—</td><td>Nombre</td></tr>
+        <tr><td>slug</td><td>VARCHAR(170)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Identificador amigable</td></tr>
+        <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Si está en uso</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+      </table>
+
+      <h4>4.2 categoria_tienda_mapeo</h4>
+      <p>Mapea categorías locales con sus equivalentes en cada tienda Woo.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>categoria_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → categorias.id (CASCADE)</td><td>Categoría local</td></tr>
+        <tr><td>tienda_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → tiendas.id (CASCADE)</td><td>Tienda Woo</td></tr>
+        <tr><td>woo_category_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>ID en WooCommerce</td></tr>
+        <tr><td>ultima_sync_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Última sync confirmada</td></tr>
+        <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (categoria_id, tienda_id)</td></tr>
+      </table>
+
+      <h4>4.3 atributos</h4>
+      <p>Atributos de variación (Color, Talla, etc.).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>nombre</td><td>VARCHAR(100)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Ej. "Color", "Talla"</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+      </table>
+
+      <h4>4.4 valores_atributo</h4>
+      <p>Valores posibles de un atributo (Rojo, M, L, etc.).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>atributo_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → atributos.id (CASCADE)</td><td>Atributo padre</td></tr>
+        <tr><td>valor</td><td>VARCHAR(100)</td><td>No</td><td>—</td><td>—</td><td>Ej. "Rojo"</td></tr>
+        <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (atributo_id, valor)</td></tr>
+      </table>
+
+      <h4>4.5 productos</h4>
+      <p>Producto padre (simple o variable).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>categoria_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → categorias.id (SET NULL)</td><td>Categoría principal</td></tr>
+        <tr><td>tipo</td><td>ENUM('simple','variable')</td><td>No</td><td>'simple'</td><td>INDEX</td><td>Tipo de producto</td></tr>
+        <tr><td>nombre</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>INDEX (FULLTEXT recomendado)</td><td>Nombre del producto</td></tr>
+        <tr><td>descripcion</td><td>TEXT</td><td>Sí</td><td>NULL</td><td>—</td><td>Descripción larga</td></tr>
+        <tr><td>codigo_interno</td><td>VARCHAR(60)</td><td>Sí</td><td>NULL</td><td>UNIQUE</td><td>Código propio del sistema</td></tr>
+        <tr><td>activo</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Disponible para venta</td></tr>
+        <tr><td>origen_creacion</td><td>ENUM('pos','woo')</td><td>No</td><td>'pos'</td><td>—</td><td>Dónde se creó originalmente</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+        <tr><td>deleted_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Soft delete</td></tr>
+      </table>
+
+      <h4>4.6 producto_variantes</h4>
+      <p>Cada variante vendible. Para simple: una variante default. Para variable: una por combinación de atributos.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>producto_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → productos.id (CASCADE)</td><td>Producto padre</td></tr>
+        <tr><td>sku</td><td>VARCHAR(100)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Código de la variante</td></tr>
+        <tr><td>precio_base</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Precio de referencia</td></tr>
+        <tr><td>precio_web</td><td>DECIMAL(12,2) UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Precio específico para web</td></tr>
+        <tr><td>unidad_medida</td><td>ENUM('unidad','kg','lt','otro')</td><td>No</td><td>'unidad'</td><td>—</td><td>Si admite fracciones</td></tr>
+        <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Disponible para venta</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+        <tr><td>deleted_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Soft delete</td></tr>
+      </table>
+
+      <h4>4.7 producto_variante_valores (pivote)</h4>
+      <p>Combinación atributo→valor que define cada variante (ej. Color=Rojo + Talla=M).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>producto_variante_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>PK compuesta, FK → producto_variantes.id (CASCADE)</td><td>Variante</td></tr>
+        <tr><td>valor_atributo_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>PK compuesta, FK → valores_atributo.id (CASCADE)</td><td>Valor de atributo</td></tr>
+      </table>
+
+      <h4>4.8 producto_tienda_mapeo</h4>
+      <p>Mapea cada variante local con su equivalente en cada tienda Woo. Clave para sync sin asumir IDs coincidentes.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>producto_variante_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → producto_variantes.id (CASCADE)</td><td>Variante local</td></tr>
+        <tr><td>tienda_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → tiendas.id (CASCADE)</td><td>Tienda Woo</td></tr>
+        <tr><td>woo_product_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>ID del producto en Woo</td></tr>
+        <tr><td>woo_variation_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>ID de variación (NULL si simple)</td></tr>
+        <tr><td>hash_ultima_sync</td><td>VARCHAR(64)</td><td>Sí</td><td>NULL</td><td>—</td><td>Hash para detectar cambios reales</td></tr>
+        <tr><td>ultima_sync_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Última sync confirmada</td></tr>
+        <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (producto_variante_id, tienda_id)</td></tr>
+      </table>
+
+      <h3>5. Stock</h3>
+
+      <h4>5.1 stock_movimientos</h4>
+      <p>Libro de movimientos (Ledger). Fuente de verdad del stock. Inmutable.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → sucursales.id (RESTRICT)</td><td>Sucursal del movimiento</td></tr>
+        <tr><td>producto_variante_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → producto_variantes.id (RESTRICT)</td><td>Variante afectada</td></tr>
+        <tr><td>tipo_movimiento</td><td>ENUM('entrada','salida','venta_fisica','venta_web','ajuste','reserva','liberacion_reserva','devolucion')</td><td>No</td><td>—</td><td>INDEX</td><td>Tipo de movimiento</td></tr>
+        <tr><td>cantidad</td><td>DECIMAL(12,3)</td><td>No</td><td>—</td><td>—</td><td>Cantidad (± según convención)</td></tr>
+        <tr><td>tienda_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → tiendas.id (SET NULL)</td><td>Origen si es pedido web</td></tr>
+        <tr><td>venta_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → ventas.id (SET NULL)</td><td>Venta asociada</td></tr>
+        <tr><td>usuario_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → usuarios.id (SET NULL)</td><td>Usuario que generó el movimiento</td></tr>
+        <tr><td>comentario</td><td>VARCHAR(255)</td><td>Sí</td><td>NULL</td><td>—</td><td>Nota libre</td></tr>
+        <tr><td>created_at</td><td>DATETIME</td><td>No</td><td>—</td><td>INDEX (sucursal_id, producto_variante_id, created_at)</td><td>Índice compuesto crítico para performance</td></tr>
+      </table>
+
+      <h4>5.2 stock_actual (caché)</h4>
+      <p>Snapshot calculado del stock disponible y reservado. Se recalcula incrementalmente al insertar un movimiento.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>PK compuesta, FK → sucursales.id (CASCADE)</td><td>Sucursal</td></tr>
+        <tr><td>producto_variante_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>PK compuesta, FK → producto_variantes.id (CASCADE)</td><td>Variante</td></tr>
+        <tr><td>cantidad_disponible</td><td>DECIMAL(12,3)</td><td>No</td><td>0</td><td>—</td><td>Stock disponible</td></tr>
+        <tr><td>cantidad_reservada</td><td>DECIMAL(12,3)</td><td>No</td><td>0</td><td>—</td><td>Stock comprometido en tránsito</td></tr>
+        <tr><td>actualizado_at</td><td>TIMESTAMP</td><td>No</td><td>CURRENT_TIMESTAMP ON UPDATE</td><td>—</td><td>Última recalculación</td></tr>
+      </table>
+
+      <h3>6. Operación de caja</h3>
+
+      <h4>6.1 sesiones_caja</h4>
+      <p>Apertura y cierre de caja por sucursal/usuario.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → sucursales.id (RESTRICT)</td><td>Sucursal</td></tr>
+        <tr><td>usuario_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → usuarios.id (RESTRICT)</td><td>Cajero responsable</td></tr>
+        <tr><td>monto_inicial</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Monto declarado al abrir</td></tr>
+        <tr><td>monto_final_declarado</td><td>DECIMAL(12,2) UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Monto contado al cerrar</td></tr>
+        <tr><td>monto_final_sistema</td><td>DECIMAL(12,2) UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Monto esperado según ventas</td></tr>
+        <tr><td>estado</td><td>ENUM('abierta','cerrada')</td><td>No</td><td>'abierta'</td><td>INDEX</td><td>Estado de la sesión</td></tr>
+        <tr><td>fecha_apertura</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Momento de apertura</td></tr>
+        <tr><td>fecha_cierre</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Momento de cierre</td></tr>
+      </table>
+
+      <h3>7. Clientes y privacidad (Ley 21.719)</h3>
+
+      <h4>7.1 clientes</h4>
+      <p>Minimización de datos, campos sensibles cifrados a nivel de aplicación.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>nombre</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>—</td><td>Nombre del cliente</td></tr>
+        <tr><td>email</td><td>VARCHAR(150)</td><td>Sí</td><td>NULL</td><td>UNIQUE</td><td>Correo (para matching con Woo)</td></tr>
+        <tr><td>telefono</td><td>VARCHAR(30)</td><td>Sí</td><td>NULL</td><td>—</td><td>Teléfono de contacto</td></tr>
+        <tr><td>rut_cifrado</td><td>VARCHAR(255)</td><td>Sí</td><td>NULL</td><td>—</td><td>RUT cifrado (Laravel Crypt)</td></tr>
+        <tr><td>direccion</td><td>VARCHAR(255)</td><td>Sí</td><td>NULL</td><td>—</td><td>Dirección</td></tr>
+        <tr><td>consentimiento_datos</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>0</td><td>—</td><td>Consentimiento explícito otorgado</td></tr>
+        <tr><td>finalidad_consentimiento</td><td>VARCHAR(255)</td><td>Sí</td><td>NULL</td><td>—</td><td>Para qué se autorizó usar datos</td></tr>
+        <tr><td>fecha_consentimiento</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Cuándo se otorgó</td></tr>
+        <tr><td>anonimizado</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>0</td><td>INDEX</td><td>1 si fue anonimizado por solicitud</td></tr>
+        <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+        <tr><td>deleted_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Soft delete</td></tr>
+      </table>
+
+      <h4>7.2 cliente_tienda_mapeo</h4>
+      <p>Mapea cliente local con su equivalente en cada tienda Woo.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>cliente_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → clientes.id (CASCADE)</td><td>Cliente local</td></tr>
+        <tr><td>tienda_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → tiendas.id (CASCADE)</td><td>Tienda Woo</td></tr>
+        <tr><td>woo_customer_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>ID en WooCommerce</td></tr>
+        <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (cliente_id, tienda_id)</td></tr>
+      </table>
+
+      <h4>7.3 clientes_solicitudes_privacidad</h4>
+      <p>Registro de solicitudes de derechos ARCO+ (Ley 21.719).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>cliente_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → clientes.id (RESTRICT)</td><td>Cliente solicitante</td></tr>
+        <tr><td>tipo_solicitud</td><td>ENUM('acceso','rectificacion','cancelacion','oposicion')</td><td>No</td><td>—</td><td>INDEX</td><td>Derecho ejercido</td></tr>
+        <tr><td>estado</td><td>ENUM('recibida','en_proceso','resuelta','rechazada')</td><td>No</td><td>'recibida'</td><td>INDEX</td><td>Estado de gestión</td></tr>
+        <tr><td>detalle</td><td>TEXT</td><td>Sí</td><td>NULL</td><td>—</td><td>Detalle o respuesta</td></tr>
+        <tr><td>usuario_gestor_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → usuarios.id (SET NULL)</td><td>Admin que gestionó</td></tr>
+        <tr><td>created_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Fecha de solicitud</td></tr>
+        <tr><td>resuelta_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Fecha de resolución</td></tr>
+      </table>
+
+      <h3>8. Ventas</h3>
+
+      <h4>8.1 ventas</h4>
+      <p>Cabecera de cada venta (física o web).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → sucursales.id (RESTRICT)</td><td>Sucursal que despacha</td></tr>
+        <tr><td>tienda_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → tiendas.id (SET NULL)</td><td>Origen Woo (NULL = física)</td></tr>
+        <tr><td>cliente_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → clientes.id (SET NULL)</td><td>Cliente asociado</td></tr>
+        <tr><td>usuario_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → usuarios.id (SET NULL)</td><td>Cajero que registró</td></tr>
+        <tr><td>sesion_caja_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → sesiones_caja.id (SET NULL)</td><td>Sesión de caja</td></tr>
+        <tr><td>canal_origen</td><td>ENUM('pos','web')</td><td>No</td><td>'pos'</td><td>INDEX</td><td>Origen de la venta</td></tr>
+        <tr><td>estado</td><td>ENUM('borrador','pendiente_despacho','en_transito','completada','cancelada','devuelta')</td><td>No</td><td>'completada'</td><td>INDEX</td><td>Estado del ciclo de vida</td></tr>
+        <tr><td>referencia_pedido_woo_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>INDEX</td><td>ID del pedido en WooCommerce</td></tr>
+        <tr><td>monto_subtotal</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Suma líneas antes descuentos</td></tr>
+        <tr><td>monto_descuento</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Descuento total</td></tr>
+        <tr><td>monto_total</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Total final</td></tr>
+        <tr><td>moneda</td><td>CHAR(3)</td><td>No</td><td>'CLP'</td><td>—</td><td>Código ISO 4217</td></tr>
+        <tr><td>created_at</td><td>DATETIME</td><td>No</td><td>—</td><td>INDEX (sucursal_id, estado, created_at)</td><td>Índice compuesto crítico para reportes</td></tr>
+        <tr><td>updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Última modificación</td></tr>
+        <tr><td>fecha_despacho</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Confirmación de despacho</td></tr>
+      </table>
+
+      <h4>8.2 venta_detalle</h4>
+      <p>Líneas de producto de cada venta.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>venta_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → ventas.id (CASCADE)</td><td>Venta padre</td></tr>
+        <tr><td>producto_variante_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → producto_variantes.id (RESTRICT)</td><td>Variante vendida</td></tr>
+        <tr><td>cantidad</td><td>DECIMAL(12,3)</td><td>No</td><td>—</td><td>—</td><td>Cantidad vendida</td></tr>
+        <tr><td>precio_unitario</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>Precio histórico al momento de venta</td></tr>
+        <tr><td>descuento_unitario</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Descuento por unidad</td></tr>
+        <tr><td>subtotal</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>(precio_unitario - descuento) * cantidad</td></tr>
+      </table>
+
+      <h4>8.3 venta_pagos</h4>
+      <p>Medios de pago por venta (soporta pagos mixtos). Preparado para Webpay futuro.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>venta_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → ventas.id (CASCADE)</td><td>Venta asociada</td></tr>
+        <tr><td>medio_pago</td><td>ENUM('efectivo','tarjeta','transferencia','webpay','otro')</td><td>No</td><td>—</td><td>INDEX</td><td>Medio de pago</td></tr>
+        <tr><td>monto</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>Monto pagado</td></tr>
+        <tr><td>referencia_transaccion</td><td>VARCHAR(150)</td><td>Sí</td><td>NULL</td><td>—</td><td>ID transacción externa</td></tr>
+        <tr><td>estado</td><td>ENUM('registrado','confirmado','anulado')</td><td>No</td><td>'registrado'</td><td>—</td><td>Estado del pago</td></tr>
+        <tr><td>created_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Fecha de registro</td></tr>
+      </table>
+
+      <h3>9. Sincronización WooCommerce</h3>
+
+      <h4>9.1 sync_eventos</h4>
+      <p>Registro unificado de cada intento de sincronización (cola de reintentos + auditoría).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>tienda_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → tiendas.id (CASCADE)</td><td>Tienda involucrada</td></tr>
+        <tr><td>entidad_tipo</td><td>ENUM('producto','categoria','stock','pedido','cliente')</td><td>No</td><td>—</td><td>INDEX</td><td>Tipo de entidad</td></tr>
+        <tr><td>entidad_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>INDEX</td><td>ID local de la entidad</td></tr>
+        <tr><td>direccion</td><td>ENUM('entrante','saliente')</td><td>No</td><td>—</td><td>INDEX</td><td>Dirección del flujo</td></tr>
+        <tr><td>estado</td><td>ENUM('pendiente','procesando','exitoso','fallido')</td><td>No</td><td>'pendiente'</td><td>INDEX (estado, entidad_tipo)</td><td>Estado del intento</td></tr>
+        <tr><td>intentos</td><td>TINYINT UNSIGNED</td><td>No</td><td>0</td><td>—</td><td>Reintentos realizados</td></tr>
+        <tr><td>ultimo_error</td><td>TEXT</td><td>Sí</td><td>NULL</td><td>—</td><td>Detalle del último error</td></tr>
+        <tr><td>payload</td><td>JSON</td><td>Sí</td><td>NULL</td><td>—</td><td>Datos enviados/recibidos</td></tr>
+        <tr><td>created_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Fecha de creación</td></tr>
+        <tr><td>procesado_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Fecha de resolución</td></tr>
+      </table>
+
+      <h3>10. Auditoría</h3>
+
+      <h4>10.1 auditoria_accesos</h4>
+      <p>Registro de acceso a datos personales (Ley 21.719).</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>usuario_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → usuarios.id (SET NULL)</td><td>Usuario (NULL = proceso auto)</td></tr>
+        <tr><td>entidad_tipo</td><td>VARCHAR(50)</td><td>No</td><td>—</td><td>INDEX</td><td>Ej. "clientes"</td></tr>
+        <tr><td>entidad_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>INDEX</td><td>ID del registro accedido</td></tr>
+        <tr><td>accion</td><td>ENUM('ver','crear','editar','eliminar','exportar')</td><td>No</td><td>—</td><td>INDEX</td><td>Tipo de acción</td></tr>
+        <tr><td>ip_origen</td><td>VARCHAR(45)</td><td>Sí</td><td>NULL</td><td>—</td><td>IP origen (soporta IPv6)</td></tr>
+        <tr><td>created_at</td><td>DATETIME</td><td>No</td><td>—</td><td>INDEX</td><td>Momento del acceso</td></tr>
+      </table>
+
+      <h3>11. Reportes pre-agregados</h3>
+
+      <h4>11.1 resumen_ventas_diario</h4>
+      <p>Recalculado por cron para dashboard de reportes.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>fecha</td><td>DATE</td><td>No</td><td>—</td><td>INDEX</td><td>Día del resumen</td></tr>
+        <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → sucursales.id (CASCADE)</td><td>Sucursal</td></tr>
+        <tr><td>canal_origen</td><td>ENUM('pos','web','todos')</td><td>No</td><td>'todos'</td><td>—</td><td>Segmentación por canal</td></tr>
+        <tr><td>total_ventas</td><td>DECIMAL(14,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Monto total vendido</td></tr>
+        <tr><td>cantidad_transacciones</td><td>INT UNSIGNED</td><td>No</td><td>0</td><td>—</td><td>Número de ventas</td></tr>
+        <tr><td>ticket_promedio</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>total_ventas / cantidad</td></tr>
+        <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (fecha, sucursal_id, canal_origen)</td></tr>
+      </table>
+
+      <h4>11.2 resumen_stock_diario</h4>
+      <p>Snapshot diario de niveles de stock para análisis de tendencia.</p>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+        <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+        <tr><td>fecha</td><td>DATE</td><td>No</td><td>—</td><td>INDEX</td><td>Día del snapshot</td></tr>
+        <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → sucursales.id (CASCADE)</td><td>Sucursal</td></tr>
+        <tr><td>producto_variante_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → producto_variantes.id (CASCADE)</td><td>Variante</td></tr>
+        <tr><td>cantidad_disponible</td><td>DECIMAL(12,3)</td><td>No</td><td>0</td><td>—</td><td>Stock al cierre del día</td></tr>
+        <tr><td>cantidad_reservada</td><td>DECIMAL(12,3)</td><td>No</td><td>0</td><td>—</td><td>Stock reservado</td></tr>
+        <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (fecha, sucursal_id, producto_variante_id)</td></tr>
+      </table>
+
+      <h3>12. Resumen de relaciones clave</h3>
+      <ul>
+        <li><code>usuarios.rol_id → roles.id</code></li>
+        <li><code>usuarios ↔ sucursales</code> vía <code>usuario_sucursal</code> (N:M)</li>
+        <li><code>productos.categoria_id → categorias.id</code></li>
+        <li><code>producto_variantes.producto_id → productos.id</code></li>
+        <li><code>producto_variantes ↔ valores_atributo</code> vía <code>producto_variante_valores</code> (N:M)</li>
+        <li><code>producto_tienda_mapeo</code> conecta <code>producto_variantes</code> con <code>tiendas</code> (N:M con datos)</li>
+        <li><code>stock_movimientos</code> referencia <code>sucursales</code>, <code>producto_variantes</code>, <code>tiendas</code>, <code>ventas</code></li>
+        <li><code>ventas.cliente_id → clientes.id</code>, <code>ventas.tienda_id → tiendas.id</code>, <code>ventas.sucursal_id → sucursales.id</code></li>
+        <li><code>venta_detalle.venta_id → ventas.id</code>, <code>venta_detalle.producto_variante_id → producto_variantes.id</code></li>
+        <li><code>sync_eventos.tienda_id → tiendas.id</code></li>
+      </ul>
+
+      <h3>13. Notas para el desarrollador</h3>
+      <ul>
+        <li>Los índices compuestos marcados en <code>stock_movimientos</code> y <code>ventas</code> son <strong>críticos</strong> para rendimiento en hosting compartido (evitan table scans en los cron de reportes y reconciliación).</li>
+        <li><code>stock_actual</code> debe recalcularse de forma <strong>incremental</strong> (al insertar un movimiento) y no por recomputo total del ledger, salvo en un job de reconciliación periódico que verifique consistencia.</li>
+        <li>Todos los campos cifrados (<code>rut_cifrado</code>, <code>consumer_key</code>, <code>consumer_secret</code>, <code>webhook_secret</code>) deben cifrarse/descifrarse exclusivamente a través de un servicio central de la aplicación, nunca en consultas SQL directas.</li>
+        <li>Este diccionario cubre el alcance del MVP; los módulos de Fase 2 (facturación electrónica, pagos reales, licenciamiento centralizado) requerirán tablas adicionales que se definirán al abordar cada uno.</li>
+      </ul>
+    </article>
+
     <!-- ================================================================ -->
     <!--  SECCIÓN 3: SINCRONIZACIÓN WOOCOMMERCE                           -->
     <!-- ================================================================ -->

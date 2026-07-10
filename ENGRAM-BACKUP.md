@@ -100,7 +100,13 @@ Alternativa descartada (API stateless con Sanctum/Sanctum): requeriría tokens J
 - Node.js 20+ (para compilación Vite) — si no soporta, compilar local y subir public/build/
 - Subdominio dedicado con SSL
 
-### 2.6 Contrato de Licenciamiento
+### 2.6 Diccionario de Datos (MariaDB)
+
+28 tablas del sistema documentadas en `index.html` (sección 2.5). Motor InnoDB, utf8mb4, snake_case. Grupos: Configuración (configuracion_sistema, licencia_estado), Organización (sucursales, roles, usuarios, usuario_sucursal), Canales (tiendas), Catálogo (categorias, categoria_tienda_mapeo, atributos, valores_atributo, productos, producto_variantes, producto_variante_valores, producto_tienda_mapeo), Stock (stock_movimientos, stock_actual), Caja (sesiones_caja), Clientes (clientes, cliente_tienda_mapeo, clientes_solicitudes_privacidad), Ventas (ventas, venta_detalle, venta_pagos), Sync (sync_eventos), Auditoría (auditoria_accesos), Reportes (resumen_ventas_diario, resumen_stock_diario).
+
+FK con RESTRICT priorizado. Índices compuestos críticos en stock_movimientos y ventas. stock_actual se recalcula incrementalmente.
+
+### 2.7 Contrato de Licenciamiento
 
 **Filosofía:** Maximizar adopción MVP sin fricción. El LicensingStub siempre responde true.
 

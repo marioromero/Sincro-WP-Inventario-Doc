@@ -18,7 +18,8 @@
         { id: 'stack', title: 'Stack Tecnológico' },
         { id: 'infraestructura', title: 'Infraestructura cPanel' },
         { id: 'diagrama-topologia', title: 'Diagrama de Topología' },
-        { id: 'licenciamiento', title: 'Contrato de Licenciamiento' }
+        { id: 'licenciamiento', title: 'Contrato de Licenciamiento' },
+        { id: 'diccionario', title: 'Diccionario de Datos' }
       ]
     },
     {
