@@ -141,3 +141,24 @@ body {
 .tag-api { background: #f3e5f5; color: #6a1b9a; }
 .tag-domain { background: #e0f7fa; color: #00695c; }
 .tag-sec { background: #fce4ec; color: #c62828; }
+
+.page details {
+  margin: 0.5rem 0;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.page details summary {
+  cursor: pointer;
+  padding: 0.6rem 1rem;
+  background: #f0f0f5;
+  font-weight: 600;
+  font-size: 0.88rem;
+  user-select: none;
+}
+.page details summary:hover { background: #e8e8f0; }
+.page details summary::-webkit-details-marker { color: #5c6bc0; }
+.page details[open] { border-color: #c5cae9; }
+.page details[open] summary { background: #e8eaf6; border-bottom: 1px solid #c5cae9; }
+.page details table { margin: 0.5rem 1rem 0.8rem; width: calc(100% - 2rem); }
