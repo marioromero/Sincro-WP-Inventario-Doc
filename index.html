@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentación Técnica — POS + Inventario Multi-Sucursal</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>POS + Inventario</h1>
+      <div class="sub">Documentación Técnica · Multi-Sucursal</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+  </aside>
+
+  <!-- ===== CONTENT ===== -->
+  <main class="content" id="main-content">
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 1: VISIÓN GENERAL DEL PRODUCTO                          -->
+    <!-- ================================================================ -->
+
+    <!-- 1.1 Contexto del Producto -->
+    <article class="page" id="vision-general-contexto">
+      <div class="section-id">01 · Visión General</div>
+      <h2>Contexto del Producto</h2>
+      <p class="lead">Sistema POS + Inventario multi-sucursal diseñado para el mercado chileno, operando como capa intermedia entre WordPress + WooCommerce y los puntos de venta físicos.</p>
+
+      <h3>¿Por qué este producto?</h3>
+      <p>Los comercios chilenos que operan con WooCommerce enfrentan una desconexión crítica entre su tienda online y sus sucursales físicas: el stock no se sincroniza en tiempo real, las ventas presenciales no se reflejan en el e-commerce, y no existe una fuente de verdad única para el inventario. Este sistema resuelve ese vacío actuando como el <strong>sistema de registro central</strong> que orquesta tanto los canales digitales como los físicos.</p>
+
+      <h3>Mercado objetivo</h3>
+      <ul>
+        <li><strong>Pymes y mid-market</strong> chileno con 2 a 20 sucursales físicas.</li>
+        <li>Comercios que ya usan WooCommerce y necesitan un POS moderno conectado.</li>
+        <li>Dueños de negocio que requieren visibilidad consolidada de inventario y ventas.</li>
+      </ul>
+
+      <h3>Diferenciadores clave</h3>
+      <ul>
+        <li><strong>Local-First:</strong> El sistema funciona incluso si la conexión a internet cae, gracias al motor de colas con reintentos.</li>
+        <li><strong>Multi-sucursal nativo:</strong> Cada sucursal opera con su propio perfil de stock, precios y configuración.</li>
+        <li><strong>Zero CORS:</strong> Al usar Inertia.js sobre Laravel, el frontend y backend comparten el mismo origen, eliminando problemas de CORS en hosting compartido.</li>
+        <li><strong>Sin demonios:</strong> Diseñado para funcionar en cPanel sin procesos persistentes; las tareas diferidas se ejecutan mediante cron.</li>
+      </ul>
+
+      <div class="info-box">
+        <strong>Filosofía de diseño:</strong> Preferimos un monolito bien modularizado sobre una arquitectura de microservicios. La razón es operativa: el cliente chileno típico contrata hosting compartido donde no puede administrar contenedores ni orquestadores. Un monolito Laravel con boundaries de dominio claros es desplegable, depurable y mantenible por un solo desarrollador.
+      </div>
+    </article>
+
+    <!-- 1.2 Modelo Standalone (Local-First) -->
+    <article class="page" id="vision-general-modelo-standalone">
+      <div class="section-id">01 · Visión General</div>
+      <h2>Modelo Standalone (Local-First)</h2>
+      <p class="lead">El sistema opera como una aplicación independiente, no como un plugin de WordPress. Esta decisión arquitectónica es fundamental.</p>
+
+      <h3>¿Qué significa "Standalone"?</h3>
+      <p>El sistema corre en su propio subdominio (ej. <code>sistema.mi-tienda.cl</code>) con su propia base de datos Laravel. WordPress y WooCommerce quedan en otro subdominio o ruta (ej. <code>tienda.mi-tienda.cl</code> o <code>/tienda</code>). La comunicación entre ambos sistemas ocurre exclusivamente por API.</p>
+
+      <h3>Ventajas del modelo Standalone</h3>
+      <ul>
+        <li><strong>Aislamiento tecnológico:</strong> Laravel no comparte el proceso de PHP con WordPress. Una actualización de WooCommerce no rompe el POS.</li>
+        <li><strong>Stack moderno:</strong> Podemos usar Vue 3, Tailwind y Vite sin depender de la cadena de build de WordPress.</li>
+        <li><strong>Escalabilidad independiente:</strong> Cada sistema puede escalar sus recursos según su demanda específica.</li>
+        <strong>Seguridad:</strong> El panel administrativo no expone rutas de WordPress. Se reduce la superficie de ataque.</li>
+      </ul>
+
+      <h3>Arquitectura Local-First</h3>
+      <p>A diferencia de las SaaS que requieren conexión permanente, este sistema prioriza la operación local:</p>
+      <ol>
+        <li><strong>Operación local inmediata:</strong> Cada transacción POS se registra primero en la base de datos local de Laravel.</li>
+        <li><strong>Sincronización asíncrona:</strong> Las actualizaciones hacia WooCommerce se encolan y procesan sin bloquear al usuario.</li>
+        <li><strong>Reintentos automáticos:</strong> Si WooCommerce no responde, la cola reintenta con backoff exponencial.</li>
+        <li><strong>Consistencia eventual:</strong> El sistema garantiza que el stock de WooCommerce convergerá al valor real, pero acepta desfases temporales controlados.</li>
+      </ol>
+
+      <div class="warn-box">
+        <strong>Importante:</strong> El modelo Local-First implica que WooCommerce no es la fuente de verdad del stock. La fuente de verdad es el Stock Ledger del POS. WooCommerce es un reflejo (copia) cuyo rezago máximo esperado es de 1-2 minutos en condiciones normales.
+      </div>
+    </article>
+
+    <!-- 1.3 Alcance del MVP -->
+    <article class="page" id="vision-general-alcance-mvp">
+      <div class="section-id">01 · Visión General</div>
+      <h2>Alcance del MVP</h2>
+      <p class="lead">El Producto Mínimo Viable entrega funcionalidad transaccional completa para un operador POS y gestión básica de inventario.</p>
+
+      <h3>Incluido en el MVP</h3>
+      <table>
+        <tr><th>Módulo</th><th>Funcionalidades</th></tr>
+        <tr><td>POS (Punto de Venta)</td><td>Venta con selección de productos, cálculo de total, descuentos línea y global, múltiples medios de pago (efectivo, débito, crédito), impresión de ticket.</td></tr>
+        <tr><td>Catálogo de Productos</td><td>CRUD de productos, variantes (talla/color), precios multi-sucursal, gestión de SKU, importación/exportación CSV.</td></tr>
+        <tr><td>Inventario por Sucursal</td><td>Stock segregado por sucursal, transferencias entre sucursales, ajustes de inventario con razón, alerta de stock crítico.</td></tr>
+        <tr><td>Sincronización WooCommerce</td><td>Publicación bidireccional de stock, creación/actualización de productos desde el POS hacia WooCommerce, recepción de pedidos web.</td></tr>
+        <tr><td>Gestión de Pedidos</td><td>Pedidos web importados desde WooCommerce, pedidos POS locales, rutas de despacho simples.</td></tr>
+        <tr><td>Roles y Usuarios</td><td>Roles: Administrador, Supervisor, Vendedor, Bodeguero. Sesiones por sucursal.</td></tr>
+      </table>
+
+      <h3>Fuera del alcance del MVP</h3>
+      <table>
+        <tr><th>Funcionalidad</th><th>Postergado a</th></tr>
+        <tr><td>Facturación electrónica (DTE)</td><td>Fase 2 — Se integrará con servicio externo (ej. SII, PayMe).</td></tr>
+        <tr><td>Integración Webpay presencial (POS físico)</td><td>Fase 2 — Requiere certificación Transbank.</td></tr>
+        <tr><td>Reportes avanzados e inteligencia de negocio</td><td>Fase 2 — Tablero analítico con métricas de ventas, rotación de stock, etc.</td></tr>
+        <tr><td>App móvil nativa (Android/iOS)</td><td>Fase 3 — PWA como paso intermedio.</td></tr>
+        <tr><td>Integración contable (Tally, Siigo, Defontana)</td><td>Fase 3 — Exportación de asientos contables.</td></tr>
+        <tr><td>CRM y fidelización</td><td>Fase 3 — Programa de puntos, historial de cliente.</td></tr>
+      </table>
+
+      <h3>Criterios de éxito del MVP</h3>
+      <ul>
+        <li>Un operador puede completar una venta POS en &lt;15 segundos.</li>
+        <li>El stock se sincroniza con WooCommerce en &lt;2 minutos.</li>
+        <li>Un administrador puede crear productos y asignarlos a sucursales desde la misma interfaz.</li>
+        <li>No se pierde ninguna transacción aunque caiga la conectividad con WooCommerce.</li>
+      </ul>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 2: ARQUITECTURA Y TOPOLOGÍA                             -->
+    <!-- ================================================================ -->
+
+    <!-- 2.1 Stack Tecnológico -->
+    <article class="page" id="arquitectura-stack">
+      <div class="section-id">02 · Arquitectura</div>
+      <h2>Stack Tecnológico</h2>
+      <p class="lead">Justificación completa de cada decisión tecnológica, con énfasis en las restricciones del entorno cPanel de hosting compartido chileno.</p>
+
+      <h3>Backend: Laravel 11</h3>
+      <p>Laravel es la opción natural para un monolito PHP moderno. Proporciona ORM (Eloquent), sistema de colas con múltiples drivers, autenticación, autorización por políticas, y un ecosistema maduro de paquetes. La versión 11 trae mejoras de rendimiento significativas y una estructura más limpia.</p>
+
+      <h3>Frontend: Vue 3 + Inertia.js</h3>
+      <p><strong>Justificación clave:</strong> En un entorno cPanel, donde no podemos configurar un proxy reverso ni manejar CORS fácilmente, Inertia.js elimina la necesidad de una API REST separada. El frontend Vue 3 se renderiza desde las mismas rutas de Laravel, compartiendo sesión, CSRF y autenticación sin configuración adicional.</p>
+      <blockquote>
+        <strong>Alternativa descartada — API stateless (Breeze/Sanctum):</strong> Requeriría manejar tokens JWT, refresh tokens, CORS headers y una doble pipeline de despliegue (frontend separado). En cPanel, cada origen extra es una fuente potencial de bloqueos y bugs difíciles de depurar. Inertia.js reduce la superficie de integración a una sola capa.
+      </blockquote>
+
+      <h3>Base de Datos: MySQL 8 / MariaDB 10.6+</h3>
+      <p>Motor InnoDB con transacciones ACID. El esquema usa migraciones de Laravel. Se prioriza la integridad referencial sobre la flexibilidad documental (no usamos MongoDB ni bases文档). El driver de colas será <code>database</code> (tabla <code>jobs</code>), no Redis, porque cPanel no ofrece Redis como servicio estándar.</p>
+
+      <h3>Build Tooling: Vite + Laravel Vite Plugin</h3>
+      <p>Vite reemplaza a Laravel Mix (Webpack). Ofrece HMR ultrarrápido en desarrollo y builds optimizadas en producción. Los assets compilados se sirven desde <code>public/build/</code>.</p>
+
+      <h3>Cron como Task Scheduler</h3>
+      <p>En cPanel no podemos mantener un proceso supervisor (como Supervisor en Linux) para gestionar workers de cola. La solución es un cron maestro que ejecuta <code>php artisan queue:work --stop-when-empty</code> cada minuto. Este patrón es estándar en la comunidad Laravel para entornos compartidos.</p>
+
+      <h3>Resumen del Stack</h3>
+      <table>
+        <tr><th>Capa</th><th>Tecnología</th><th>Justificación</th></tr>
+        <tr><td>Framework</td><td>Laravel 11</td><td>Ecosistema maduro, colas, ORM, migraciones, testing</td></tr>
+        <tr><td>Frontend</td><td>Vue 3 + Inertia.js</td><td>Elimina CORS, sesión compartida, SPA progresivo</td></tr>
+        <tr><td>CSS</td><td>Tailwind CSS 3</td><td>Utilidades atómicas, bundles pequeños, diseño responsive</td></tr>
+        <tr><td>Base de Datos</td><td>MySQL 8 / MariaDB 10.6</td><td>ACID, disponible en todo hosting compartido</td></tr>
+        <tr><td>Colas</td><td>DB driver + Cron</td><td>Sin dependencia de Redis ni demonios externos</td></tr>
+        <tr><td>Build</td><td>Vite</td><td>HMR rápido, tree-shaking, code splitting nativo</td></tr>
+        <tr><td>E-commerce</td><td>WooCommerce (API REST)</td><td>Estandar de facto en WordPress para Chile</td></tr>
+      </table>
+    </article>
+
+    <!-- 2.2 Infraestructura cPanel -->
+    <article class="page" id="arquitectura-infraestructura">
+      <div class="section-id">02 · Arquitectura</div>
+      <h2>Infraestructura cPanel</h2>
+      <p class="lead">Restricciones operativas del entorno de hosting compartido y cómo la arquitectura se adapta a ellas.</p>
+
+      <h3>Restricciones conocidas de cPanel</h3>
+      <ul>
+        <li><strong>Sin demonios persistentes:</strong> No podemos ejecutar <code>php artisan queue:work</code> como un servicio supervisor. No hay <code>systemd</code>, <code>supervisord</code> ni <code>screen/tmux</code> disponible.</li>
+        <li><strong>Cron con intervalo mínimo de 1 minuto:</strong> El scheduler de cPanel permite ejecuciones tan frecuentes como cada minuto. Esto define el límite inferior de latencia de nuestras colas.</li>
+        <li><strong>Sin Redis/Memcached garantizado:</strong> La mayoría de planes compartidos no incluyen Redis. Algunos ofrecen Memcached pero con recursos limitados. Usamos la base de datos como driver de cola por defecto.</li>
+        <li><strong>PHP-FPM con límites de procesos:</strong> El número de workers PHP está restringido. Laravel Octane (Roadrunner/Swoole) no es viable. Mantenemos el ciclo de vida request-response tradicional.</li>
+        <li><strong>Sin control de servidor web:</strong> No podemos configurar Nginx personalizado ni reglas avanzadas de Apache. El archivo <code>.htaccess</code> es nuestra única herramienta de reescritura.</li>
+        <li><strong>Almacenamiento compartido:</strong> El disco es típicamente NFS o similar. Las operaciones de I/O intensivas deben minimizarse.</li>
+      </ul>
+
+      <h3>Estrategia de adaptación</h3>
+      <table>
+        <tr><th>Restricción</th><th>Solución</th></tr>
+        <tr><td>Sin demonios</td><td>Cron ejecuta <code>php artisan queue:work --stop-when-empty</code> cada minuto</td></tr>
+        <tr><td>Sin Redis</td><td>Driver de cola <code>database</code> con tabla <code>jobs</code> indexada</td></tr>
+        <tr><td>PHP-FPM limitado</td><td>Peticiones Inertia ligeras; API calls externalizadas a jobs de cola</td></tr>
+        <tr><td>Sin control de servidor</td><td>Toda la lógica de ruteo vive en Laravel, no en el servidor web</td></tr>
+        <tr><td>I/O compartida</td><td>Subida de archivos a disco local con sync periódico a cloud storage</td></tr>
+      </table>
+
+      <h3>Configuración recomendada de hosting</h3>
+      <ul>
+        <li>PHP 8.2+ con extensiones: BCmath, Ctype, JSON, Mbstring, OpenSSL, PDO, Tokenizer, XML, GD, Zip</li>
+        <li>MySQL 8+ con al menos 1 GB de espacio para la base de datos</li>
+        <li>Node.js 20+ (para compilación de assets con Vite)</li>
+        <li>Composer 2.x para gestión de dependencias PHP</li>
+        <li>Subdominio dedicado (ej. <code>sistema.tienda.cl</code>) con SSL</li>
+      </ul>
+
+      <div class="warn-box">
+        <strong>Atención:</strong> No todos los planes de hosting compartido chileno soportan Node.js. Si el plan no lo incluye, los assets deben compilarse en entorno local y subirse ya build (carpeta <code>public/build/</code>). Es una limitación conocida que debe validarse antes de contratar.
+      </div>
+    </article>
+
+    <!-- 2.3 Diagrama de Topología -->
+    <article class="page" id="arquitectura-diagrama-topologia">
+      <div class="section-id">02 · Arquitectura</div>
+      <h2>Diagrama de Topología</h2>
+      <p class="lead">Visión macro del despliegue: cómo se conectan el navegador del usuario, el monolito Laravel en cPanel y WooCommerce.</p>
+
+      <div class="diagram-container">
+        <svg viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de topología del sistema POS+Inventario multi-sucursal">
+          <!-- Defs: marcadores de flecha -->
+          <defs>
+            <marker id="arrow-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#888"/>
+            </marker>
+            <marker id="arrow-dashed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#888"/>
+            </marker>
+            <marker id="arrow-cron" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#e65100"/>
+            </marker>
+          </defs>
+
+          <!-- Cliente Web -->
+          <rect x="30" y="190" width="150" height="70" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
+          <text x="105" y="222" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Cliente Web</text>
+          <text x="105" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="9.5" fill="#555">Navegador / SPA</text>
+
+          <!-- cPanel Hosting (contenedor grande) -->
+          <rect x="220" y="20" width="550" height="480" rx="10" fill="#fafafa" stroke="#bbb" stroke-width="1.5" stroke-dasharray="6,4"/>
+          <text x="495" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#666">cPanel Hosting (dominio compartido)</text>
+
+          <!-- Laravel Monolith -->
+          <rect x="240" y="60" width="510" height="130" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <text x="495" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" fill="#00695c">Laravel Monolith</text>
+
+          <!-- Controladores HTTP (Inertia) -->
+          <rect x="260" y="92" width="470" height="36" rx="8" fill="#e8eaf6" stroke="#c5cae9" stroke-width="1.2"/>
+          <text x="495" y="108" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Controladores HTTP</text>
+          <text x="495" y="121" text-anchor="middle" font-family="Arial, sans-serif" font-size="9.5" fill="#555">Inertia.js · Rutas Web + API propia</text>
+
+          <!-- Base de Datos (MySQL) -->
+          <rect x="260" y="142" width="470" height="36" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.2"/>
+          <text x="495" y="158" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Base de Datos</text>
+          <text x="495" y="171" text-anchor="middle" font-family="Arial, sans-serif" font-size="9.5" fill="#555">MySQL 8 · InnoDB · Stock Ledger</text>
+
+          <!-- Flecha: Controladores -> DB (ORM) -->
+          <line x1="495" y1="128" x2="495" y2="142" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-solid)"/>
+          <text x="505" y="138" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#666">Eloquent ORM</text>
+
+          <!-- Cola de Trabajos -->
+          <rect x="260" y="225" width="470" height="46" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.2"/>
+          <text x="495" y="246" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Cola de Trabajos</text>
+          <text x="495" y="262" text-anchor="middle" font-family="Arial, sans-serif" font-size="9.5" fill="#555">Driver: database · Tabla: jobs</text>
+
+          <!-- Flecha: Controladores -> Cola (dispatch) -->
+          <line x1="495" y1="178" x2="495" y2="225" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-solid)"/>
+          <text x="505" y="205" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#666">dispatch()</text>
+
+          <!-- Cron Maestro -->
+          <rect x="260" y="315" width="470" height="46" rx="8" fill="#f3e5f5" stroke="#ce93d8" stroke-width="1.2"/>
+          <text x="495" y="336" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Cron Maestro</text>
+          <text x="495" y="352" text-anchor="middle" font-family="Arial, sans-serif" font-size="9.5" fill="#555">cPanel Task Scheduler · Cada 1 min</text>
+
+          <!-- Flecha: Cron -> Cola (trigger) -->
+          <line x1="495" y1="315" x2="495" y2="271" stroke="#e65100" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrow-cron)"/>
+          <text x="510" y="296" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#e65100">queue:work --stop-when-empty</text>
+
+          <!-- WooCommerce -->
+          <rect x="820" y="190" width="150" height="70" rx="8" fill="#f3e5f5" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="895" y="222" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">WooCommerce</text>
+          <text x="895" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="9.5" fill="#555">API REST + Webhooks</text>
+
+          <!-- Flecha: Client -> Controladores (HTTP Inertia) -->
+          <line x1="180" y1="225" x2="260" y2="110" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-solid)"/>
+          <text x="210" y="175" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#666">HTTP Inertia</text>
+
+          <!-- Flecha: Cola -> WooCommerce (API Sync) -->
+          <line x1="730" y1="248" x2="820" y2="230" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-solid)"/>
+          <text x="760" y="210" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#666">Sync Stock / Prod</text>
+
+          <!-- Flecha: Controladores -> WooCommerce (API directa) -->
+          <line x1="730" y1="110" x2="820" y2="215" stroke="#888" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-dashed)"/>
+          <text x="740" y="170" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#666">API directa (lectura)</text>
+
+          <!-- Flecha: WooCommerce -> Controladores (Webhook) -->
+          <line x1="895" y1="260" x2="730" y2="128" stroke="#888" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-dashed)"/>
+          <text x="760" y="275" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#666">Webhook Callback</text>
+
+          <!-- Etiqueta de entorno: Fecha / Versión -->
+          <text x="30" y="510" font-family="Arial, sans-serif" font-size="8" fill="#999">Diagrama de topología — POS + Inventario Multi-Sucursal v1.0 (MVP)</text>
+        </svg>
+      </div>
+
+      <h3>Flujo de datos explicado</h3>
+      <ol>
+        <li><strong>Navegación del usuario:</strong> El operador POS accede mediante Inertia.js. Las vistas se renderizan desde Laravel (SSR híbrido) sin llamadas API separadas.</li>
+        <li><strong>Operación transaccional:</strong> Cada venta POS impacta primero la base de datos local (Stock Ledger). No depende de WooCommerce para completarse.</li>
+        <li><strong>Encadenamiento asíncrono:</strong> Las operaciones que deben reflejarse en WooCommerce se despachan como Jobs a la cola <code>database</code>.</li>
+        <li><strong>Procesamiento por Cron:</strong> Cada minuto, el cron de cPanel ejecuta <code>php artisan queue:work --stop-when-empty</code>, procesando todos los jobs pendientes.</li>
+        <li><strong>Sincronización saliente:</strong> Los jobs ejecutan llamadas HTTP a la API REST de WooCommerce para actualizar stock, precios o crear productos.</li>
+        <li><strong>Recepción de cambios:</strong> WooCommerce notifica eventos (nuevo pedido web, cambio de stock) vía webhook POST hacia el controlador correspondiente.</li>
+        <li><strong>Consistencia eventual:</strong> El sistema garantiza que el estado de WooCommerce convergerá al estado real, con un rezago máximo esperado de ~1-2 minutos.</li>
+      </ol>
+    </article>
+
+    <!-- 2.4 Contrato de Licenciamiento -->
+    <article class="page" id="arquitectura-licenciamiento">
+      <div class="section-id">02 · Arquitectura</div>
+      <h2>Contrato de Licenciamiento</h2>
+      <p class="lead">Mecanismo de licenciamiento diseñado para el MVP: un stub local que siempre responde como activo, con una interfaz preparada para reemplazo futuro por una API real de validación.</p>
+
+      <h3>Filosofía: habilitar, no restringir</h3>
+      <p>En la fase MVP, el objetivo es maximizar la adopción y reducir la fricción de instalación. Implementar un sistema de licenciamiento remoto desde el día cero agregaría complejidad operativa (el sistema no funcionaría sin internet), dependencia de un servicio externo aún no construido, y una experiencia de onboarding negativa.</p>
+      <p>Por eso, el MVP incluye un <strong>Licensing Stub</strong>: un contrato (interface) que el sistema consulta para verificar si la licencia está activa, pero cuya implementación concreta es una clase local que siempre retorna <code>true</code>.</p>
+
+      <h3>Diseño del contrato</h3>
+      <pre>// App\Contracts\LicenseValidator.php
+&lt;?php
+
+namespace App\Contracts;
+
+interface LicenseValidator
+{
+    public function isValid(string $licenseKey): bool;
+    public function getLicenseInfo(string $licenseKey): array;
+    public function getDaysRemaining(string $licenseKey): ?int;
+}</pre>
+
+      <h3>Implementación concreta (MVP)</h3>
+      <pre>// App\Services\LocalLicenseStub.php
+&lt;?php
+
+namespace App\Services;
+
+use App\Contracts\LicenseValidator;
+
+class LocalLicenseStub implements LicenseValidator
+{
+    public function isValid(string $licenseKey): bool
+    {
+        return true; // Stub: siempre activo en MVP
+    }
+
+    public function getLicenseInfo(string $licenseKey): array
+    {
+        return [
+            'status'    =&gt; 'active',
+            'plan'      =&gt; 'mvp-standalone',
+            'source'    =&gt; 'stub',
+        ];
+    }
+
+    public function getDaysRemaining(string $licenseKey): ?int
+    {
+        return 365; // Stub: simula 1 año
+    }
+}</pre>
+
+      <h3>Estrategia de reemplazo futuro</h3>
+      <p>Cuando el producto escale a un modelo SaaS o se requiera validación centralizada:</p>
+      <ol>
+        <li>Crear <code>App\Services\CloudLicenseService.php</code> que implemente <code>LicenseValidator</code>, conectándose a una API remota de licencias.</li>
+        <li>Cambiar el binding en <code>AppServiceProvider</code>:</li>
+      </ol>
+      <pre>// app/Providers/AppServiceProvider.php
+
+// MVP:
+\$this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
+
+// Versión SaaS futura (solo cambiar esta línea):
+// \$this->app->bind(LicenseValidator::class, CloudLicenseService::class);</pre>
+
+      <p>El resto del código no requiere modificaciones. Todos los módulos que necesitan verificar licencia dependen de la interfaz <code>LicenseValidator</code>, no de una implementación concreta.</p>
+
+      <div class="info-box">
+        <strong>Principio aplicado:</strong> Programación orientada a interfaces (Dependency Inversion). El dominio no debe conocer los detalles de infraestructura. El stub y la API futura son intercambiables sin modificar una sola línea de lógica de negocio.
+      </div>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 3: SINCRONIZACIÓN WOOCOMMERCE                           -->
+    <!-- ================================================================ -->
+
+    <article class="page" id="sincronizacion-reglas-verdad">
+      <div class="section-id">03 · Sincronización WooCommerce</div>
+      <h2>Reglas de Verdad</h2>
+      <p class="lead">Definición precisa de qué sistema es la fuente autoritativa para cada fragmento de datos, y cómo se resuelven los conflictos.</p>
+
+      <h3>Fuente de verdad por dominio</h3>
+      <table>
+        <tr><th>Dato</th><th>Fuente de Verdad</th><th>Dirección Sync</th></tr>
+        <tr><td>Stock disponible (cantidad)</td><td>POS (Stock Ledger)</td><td>POS → WooCommerce (unidireccional)</td></tr>
+        <tr><td>Catálogo de productos (SKU, nombre, precio)</td><td>POS</td><td>POS → WooCommerce (unidireccional)</td></tr>
+        <tr><td>Pedidos web (ordenes)</td><td>WooCommerce</td><td>WooCommerce → POS (unidireccional)</td></tr>
+        <tr><td>Clientes</td><td>POS (tabla local customers)</td><td>Bidireccional — POS y WC se actualizan mutuamente</td></tr>
+        <tr><td>Precios por sucursal</td><td>POS</td><td>POS → WooCommerce (mapeo por regla)</td></tr>
+        <tr><td>Imágenes de productos</td><td>WooCommerce (Media Library)</td><td>WC → POS (referencia por URL)</td></tr>
+      </table>
+
+      <h3>Reglas de resolución de conflictos</h3>
+      <ul>
+        <li><strong>Stock:</strong> WooCommerce nunca sobreescribe el stock del POS. Cualquier cambio de stock en WooCommerce (ej. devolución manual) se ignora a menos que un operador lo autorice explícitamente.</li>
+        <li><strong>Productos:</strong> El POS crea/actualiza productos y los empuja a WooCommerce. Si un producto existe solo en WooCommerce (creado directamente), se importa al POS como "no vinculado" y un administrador debe mapearlo manualmente.</li>
+        <li><strong>Pedidos web:</strong> Una vez importados al POS, los pedidos no se modifican retroactivamente desde WooCommerce. Si el estado cambia en WooCommerce, se registra como nota interna pero no altera el pedido en POS.</li>
+        <li><strong>Clientes:</strong> Regla de "última escritura gana" para datos básicos (nombre, teléfono, email). El POS es prioridad para datos locales (dirección de sucursal favorita).</li>
+      </ul>
+
+      <h3>Gráfica de consistencia</h3>
+      <p>El sistema opera en el espectro de <strong>consistencia eventual</strong>. No hay bloqueo distribuido ni transacciones distribuidas. La ventana de inconsistencia máxima esperada es:</p>
+      <ul>
+        <li>Condiciones normales: &lt; 1 minuto</li>
+        <li>Pico de carga (ej. CyberDay): &lt; 5 minutos</li>
+        <li>Caída de WooCommerce: indeterminada (backoff exponencial con reintentos cada 5 min × hasta 24 hrs)</li>
+      </ul>
+    </article>
+
+    <article class="page" id="sincronizacion-webhooks">
+      <div class="section-id">03 · Sincronización WooCommerce</div>
+      <h2>Webhooks y Sincronización</h2>
+      <p class="lead">Detalle del motor de sincronización: qué eventos se escuchan, cómo se procesan y cómo se garantiza resiliencia.</p>
+
+      <h3>Webhooks entrantes (WooCommerce → POS)</h3>
+      <p>WooCommerce dispara webhooks POST hacia una ruta dedicada del POS cuando ocurren eventos específicos. El POS expone un endpoint público (protegido por secret compartido) que recibe y valida estas notificaciones.</p>
+
+      <table>
+        <tr><th>Evento WooCommerce</th><th>Hook POS</th><th>Acción</th></tr>
+        <tr><td>order.created</td><td>POST /api/webhooks/order-created</td><td>Importar pedido a tabla orders del POS con origen "web"</td></tr>
+        <tr><td>order.updated</td><td>POST /api/webhooks/order-updated</td><td>Actualizar estado del pedido en POS (si corresponde)</td></tr>
+        <tr><td>product.updated</td><td>POST /api/webhooks/product-updated</td><td>Re-sincronizar datos del producto si el POS lo permite</td></tr>
+        <tr><td>stock.updated</td><td>POST /api/webhooks/stock-updated</td><td>Registrar en log; no sobreescribe el stock del POS</td></tr>
+      </table>
+
+      <h3>Validación de webhooks</h3>
+      <pre>// Middleware: VerifyWebhookSignature
+public function handle(Request \$request, Closure \$next)
+{
+    \$signature = \$request->header('X-WC-Webhook-Signature');
+    \$payload = \$request->getContent();
+    \$expected = base64_encode(hash_hmac('sha256', \$payload, config('services.woocommerce.webhook_secret'), true));
+
+    if (!hash_equals(\$expected, \$signature)) {
+        abort(401, 'Invalid webhook signature');
+    }
+
+    return \$next(\$request);
+}</pre>
+
+      <h3>Sincronización saliente (POS → WooCommerce)</h3>
+      <p>Los cambios originados en el POS se sincronizan hacia WooCommerce mediante Jobs encolados:</p>
+      <table>
+        <tr><th>Acción POS</th><th>Job</th><th>Endpoint WooCommerce</th></tr>
+        <tr><td>Crear producto</td><td>SyncProductToWooCommerce</td><td>POST /wp-json/wc/v3/products</td></tr>
+        <tr><td>Actualizar stock</td><td>SyncStockToWooCommerce</td><td>PUT /wp-json/wc/v3/products/{id}</td></tr>
+        <tr><td>Transferencia entre sucursales</td><td>SyncTransferToWooCommerce</td><td>PUT /wp-json/wc/v3/products/{id}</td></tr>
+        <tr><td>Crear cliente</td><td>SyncCustomerToWooCommerce</td><td>POST /wp-json/wc/v3/customers</td></tr>
+      </table>
+
+      <h3>Resiliencia del motor de sincronización</h3>
+      <ul>
+        <li><strong>Reintentos con backoff:</strong> 5 reintentos con backoff exponencial (30s, 2min, 5min, 15min, 30min).</li>
+        <li><strong>Dead Letter Queue:</strong> Jobs que fallan después de 5 intentos se mueven a tabla <code>failed_jobs</code>. Un comando artisan permite re-encolarlos manualmente.</li>
+        <li><strong>Idempotencia:</strong> Cada job incluye un UUID único. WooCommerce almacena el <code>X-Idempotency-Key</code> para evitar duplicados si el job se ejecuta más de una vez.</li>
+        <li><strong>Throttling:</strong> Respetamos los límites de rate de la API de WooCommerce (usualmente 25 requests por segundo). Usamos el middleware <code>throttle</code> de Laravel HTTP Client.</li>
+      </ul>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 4: INVENTARIO Y CATÁLOGO                                -->
+    <!-- ================================================================ -->
+
+    <article class="page" id="inventario-stock-ledger">
+      <div class="section-id">04 · Inventario y Catálogo</div>
+      <h2>Stock Ledger</h2>
+      <p class="lead">El Stock Ledger es el corazón del inventario: un registro inmutable de cada movimiento de stock que afecta la cantidad disponible de un producto en una sucursal.</p>
+
+      <h3>Principios del Ledger</h3>
+      <ul>
+        <li><strong>Inmutabilidad:</strong> Una vez registrado, un movimiento no se elimina ni modifica. Solo se compensa con un movimiento inverso.</li>
+        <li><strong>Auditabilidad:</strong> Cada movimiento tiene: quién (user_id), qué (product_id, sucursal_id), cuándo (created_at), por qué (reason enum), cuánto (quantity).</li>
+        <li><strong>Trazabilidad:</strong> Cada movimiento referencia el documento origen (venta, compra, transferencia, ajuste).</li>
+      </ul>
+
+      <h3>Esquema conceptual</h3>
+      <pre>// Migración simplificada
+Schema::create('stock_ledger', function (Blueprint \$table) {
+    \$table->id();
+    \$table->foreignId('product_id')->constrained();
+    \$table->foreignId('branch_id')->constrained('sucursales');
+    \$table->enum('type', ['sale', 'purchase', 'transfer_out', 'transfer_in',
+                           'adjustment', 'initial', 'return']);
+    \$table->integer('quantity');  // positivo = entrada, negativo = salida
+    \$table->integer('balance_after');  // saldo posterior al movimiento
+    \$table->foreignId('user_id')->constrained();
+    \$table->text('reference_type')->nullable();  // 'App\Models\Sale', etc.
+    \$table->unsignedBigInteger('reference_id')->nullable();
+    \$table->text('reason')->nullable();
+    \$table->timestamps();
+    \$table->index(['product_id', 'branch_id']);
+});</pre>
+
+      <h3>Cálculo del stock disponible</h3>
+      <p>No se almacena un campo "stock" calculado en la tabla de productos. El stock disponible se obtiene siempre agregando la tabla ledger:</p>
+      <pre>// app/Models/Product.php
+public function stockEnSucursal(Branch \$branch): int
+{
+    return \$this->stockLedger()
+        ->where('branch_id', \$branch->id)
+        ->sum('quantity');
+}</pre>
+      <p>Esto evita inconsistencias (desincronización entre el campo calculado y el ledger). Para rendimiento, se puede cachear el valor con <code>observe</code> y actualizar un campo denormalizado <code>stock_cache</code> si el volumen lo justifica.</p>
+
+      <div class="info-box">
+        <strong>Nota de rendimiento:</strong> Para inventarios de &lt;100k movimientos por sucursal, la suma directa con índice compuesto es suficientemente rápida (&lt;50ms). Para volúmenes mayores, implementar tabla de resumen (<code>branch_product_stock</code>) actualizada por eventos.
+      </div>
+    </article>
+
+    <article class="page" id="inventario-sucursales">
+      <div class="section-id">04 · Inventario y Catálogo</div>
+      <h2>Sucursales</h2>
+      <p class="lead">El modelo multi-sucursal es un pilar del dominio. Cada sucursal opera con su propio inventario, precios y configuración.</p>
+
+      <h3>Modelo de datos</h3>
+      <p>Las sucursales se modelan como una entidad separada (<code>branches</code>), no como un simple campo de texto. Cada sucursal tiene:</p>
+      <ul>
+        <li>Datos de contacto (dirección, teléfono, email)</li>
+        <li>Horario de atención (JSON con rangos semanales)</li>
+        <li>Configuración POS (impresora por defecto, cajón de dinero, logo personalizado)</li>
+        <li>Lista de usuarios asignados (relación many-to-many con roles específicos por sucursal)</li>
+        <li>Precios propios (sobreescriben el precio base del producto)</li>
+        <li>Stock segregado (cada movimiento en el ledger pertenece a una sucursal)</li>
+      </ul>
+
+      <h3>Transferencias entre sucursales</h3>
+      <p>El flujo de transferencia sigue un proceso de dos pasos:</p>
+      <ol>
+        <li><strong>Salida (origen):</strong> Se registra un movimiento <code>transfer_out</code> en la sucursal A, reduciendo su stock. El producto queda en estado "en tránsito".</li>
+        <li><strong>Entrada (destino):</strong> Cuando la sucursal B confirma recepción, se registra un movimiento <code>transfer_in</code> que incrementa el stock. Firma digital del receptor opcional.</li>
+      </ol>
+
+      <h3>Reglas de dominio sobre sucursales</h3>
+      <ul>
+        <li>Un producto puede existir sin stock en una sucursal (aparece en catálogo pero no disponible).</li>
+        <li>Los precios por sucursal son opcionales. Si no se definen, se usa el precio base del producto.</li>
+        <li>Un usuario puede tener roles diferentes en distintas sucursales (ej. Vendedor en Sucursal A, Supervisor en Sucursal B).</li>
+        <li>El stock global (todas las sucursales) se usa solo para reportes; la operación diaria siempre es por sucursal.</li>
+      </ul>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 5: VENTAS Y PEDIDOS WEB                                 -->
+    <!-- ================================================================ -->
+
+    <article class="page" id="ventas-rutas-despacho">
+      <div class="section-id">05 · Ventas y Pedidos Web</div>
+      <h2>Rutas de Despacho</h2>
+      <p class="lead">Los pedidos web importados desde WooCommerce requieren asignación a una sucursal para su preparación y despacho. Este proceso se modela como "Ruta de Despacho".</p>
+
+      <h3>Modelo conceptual</h3>
+      <p>Cuando un pedido llega desde WooCommerce, el sistema intenta asignarlo automáticamente a la sucursal más cercana al domicilio del cliente según la comuna de envío. Si no hay coincidencia, el pedido queda en "buzón de asignación" para que un supervisor lo asigne manualmente.</p>
+
+      <h3>Lógica de asignación automática</h3>
+      <pre>// Pseudo-código de la asignación
+function asignarSucursal(PedidoWeb \$pedido): Branch
+{
+    // 1. Obtener comuna de envío desde el pedido de WooCommerce
+    \$comuna = \$pedido->shipping_address['city'];
+
+    // 2. Buscar sucursal con cobertura en esa comuna
+    \$sucursal = Branch::whereHas('coberturas', fn(\$q) =>
+        \$q->where('comuna', \$comuna)
+          ->where('activa', true)
+    )->first();
+
+    // 3. Si hay resultado, asignar
+    if (\$sucursal) return \$sucursal;
+
+    // 4. Fallback: asignar a sucursal por defecto del cliente
+    \$sucursal = \$pedido->cliente->sucursalPreferida;
+    if (\$sucursal) return \$sucursal;
+
+    // 5. Último recurso: sucursal principal (configurable)
+    return Branch::where('es_principal', true)->first();
+}</pre>
+
+      <h3>Estados de una ruta de despacho</h3>
+      <table>
+        <tr><th>Estado</th><th>Descripción</th></tr>
+        <tr><td>pending_assignment</td><td>Pedido web importado, esperando asignación a sucursal</td></tr>
+        <tr><td>assigned</td><td>Asignado a sucursal, pendiente de preparación</td></tr>
+        <tr><td>preparing</td><td>Bodeguero está armando el pedido</td></tr>
+        <tr><td>ready_for_pickup</td><td>Listo para retiro en sucursal</td></tr>
+        <tr><td>in_delivery</td><td>En ruta de despacho a domicilio</td></tr>
+        <tr><td>delivered</td><td>Entregado al cliente</td></tr>
+        <tr><td>cancelled</td><td>Cancelado (con nota de razón)</td></tr>
+      </table>
+
+      <h3>Integración con WooCommerce</h3>
+      <p>Cuando un pedido cambia de estado en el POS (ej. a "delivered"), el sistema actualiza el estado del pedido en WooCommerce mediante la API REST, permitiendo que el cliente vea el progreso desde su cuenta de WooCommerce.</p>
+
+      <div class="warn-box">
+        <strong>MVP vs futuro:</strong> En el MVP, las rutas de despacho se gestionan manualmente desde el panel POS. La integración con servicios externos de tracking (Chilexpress, Starken, Bluexpress) queda para fases posteriores.
+      </div>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 6: CUMPLIMIENTO Y SEGURIDAD                             -->
+    <!-- ================================================================ -->
+
+    <article class="page" id="cumplimiento-privacidad">
+      <div class="section-id">06 · Cumplimiento y Seguridad</div>
+      <h2>Privacidad (Ley 21.719)</h2>
+      <p class="lead">La Ley 21.719 (ley chilena de protección de datos personales, que modifica la Ley 19.628) exige que cualquier sistema que procese datos de ciudadanos chilenos implemente medidas específicas de privacidad desde el diseño.</p>
+
+      <h3>Obligaciones aplicables</h3>
+      <table>
+        <tr><th>Requisito</th><th>Implementación</th></tr>
+        <tr><td>Consentimiento explícito</td><td>Checkbox separado en registro de clientes; no pre-seleccionado. Registro de consentimiento con fecha y versión de política.</td></tr>
+        <tr><td>Derecho de acceso, rectificación, cancelación y oposición (ARCO)</td><td>API de exportación de datos personales por cliente. Endpoint de eliminación lógica (soft-delete con anonimización).</td></tr>
+        <tr><td>Portabilidad</td><td>Exportación JSON de datos del cliente descargable desde el perfil.</td></tr>
+        <tr><td>Seguridad de datos</td><td>Encriptación en reposo (AES-256 para datos sensibles), TLS 1.3 en tránsito, hashing de contraseñas con bcrypt.</td></tr>
+        <tr><td>Notificación de brechas</td><td>Log de accesos a datos personales. Alerta automática al administrador ante patrones anómalos.</td></tr>
+        <tr><td>Periodo de retención</td><td>Configurable por tipo de dato. Política de purga automática tras 5 años sin actividad.</td></tr>
+      </table>
+
+      <h3>Datos sensibles identificados</h3>
+      <ul>
+        <li>RUT/DNI del cliente (encriptado en reposo con <code>lakm/laravel-encrypted-trait</code>)</li>
+        <li>Dirección de envío y facturación</li>
+        <li>Teléfono y email</li>
+        <li>Historial de compras (se mantiene pero se anonimiza el vínculo a persona natural tras la purga)</li>
+      </ul>
+
+      <div class="info-box">
+        <strong>Nota:</strong> Esta documentación no constituye asesoría legal. Se recomienda que un abogado especialista en protección de datos revise el cumplimiento específico para cada instalación.
+      </div>
+    </article>
+
+    <article class="page" id="cumplimiento-roles">
+      <div class="section-id">06 · Cumplimiento y Seguridad</div>
+      <h2>Roles y Permisos</h2>
+      <p class="lead">Modelo de autorización basado en roles con granularidad a nivel de sucursal. No hay superusuarios globales por defecto.</p>
+
+      <h3>Roles del sistema</h3>
+      <table>
+        <tr><th>Rol</th><th>Permisos clave</th><th>Ámbito</th></tr>
+        <tr><td>Administrador</td><td>CRUD productos, sucursales, usuarios; ver reportes; configurar sistema; gestionar licencias</td><td>Global (todas las sucursales)</td></tr>
+        <tr><td>Supervisor</td><td>Ver reportes de sucursal asignada; anular ventas; gestionar transferencias; asignar pedidos web</td><td>Por sucursal</td></tr>
+        <tr><td>Vendedor</td><td>Realizar ventas POS; ver stock de sucursal; registrar clientes; imprimir tickets</td><td>Por sucursal</td></tr>
+        <tr><td>Bodeguero</td><td>Recibir transferencias; realizar ajustes de inventario; preparar pedidos web</td><td>Por sucursal</td></tr>
+      </table>
+
+      <h3>Implementación técnica</h3>
+      <p>Usamos <code>spatie/laravel-permission</code> con una adaptación multi-sucursal:</p>
+      <ul>
+        <li>Los roles se asignan a un usuario <strong>en relación con una sucursal</strong> (pivot table <code>model_branch_roles</code>).</li>
+        <li>El middleware <code>CheckBranchAccess</code> verifica que el usuario autenticado tenga el rol requerido en la sucursal actual de la sesión.</li>
+        <li>Los permisos globales (administración del sistema) se asignan sin sucursal.</li>
+      </ul>
+
+      <h3>Matriz de autorización</h3>
+      <pre>// Gates de ejemplo
+Gate::define('manage-stock', fn(User \$user, Branch \$branch) =&gt;
+    \$user->hasRole(['administrador', 'supervisor', 'bodeguero'], \$branch->id)
+);
+
+Gate::define('void-sale', fn(User \$user, Branch \$branch) =&gt;
+    \$user->hasRole(['administrador', 'supervisor'], \$branch->id)
+);
+
+Gate::define('configure-system', fn(User \$user) =&gt;
+    \$user->hasRole('administrador') // Global, sin sucursal
+);</pre>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 7: PREGUNTAS ABIERTAS                                   -->
+    <!-- ================================================================ -->
+
+    <article class="page" id="preguntas-webpay-fisico">
+      <div class="section-id">07 · Preguntas Abiertas</div>
+      <h2>Webpay Físico</h2>
+      <p class="lead">La integración con Webpay Plus Presencial (terminal POS físico de Transbank) queda fuera del MVP pero es la funcionalidad más solicitada por los clientes.</p>
+
+      <h3>¿Qué implica?</h3>
+      <p>Webpay Plus Presencial requiere un terminal POS físico conectado por puerto serie o Bluetooth a un computador con el sistema POS. Transbank provee un SDK (generalmente DLL en Windows o JAR en Java) que debe ser llamado desde el sistema para iniciar la transacción.</p>
+
+      <h3>Desafíos técnicos</h3>
+      <ul>
+        <li><strong>Compatibilidad con Laravel (PHP):</strong> El SDK de Transbank es para Java/.NET. Habría que crear un bridge (ej. microservicio en Node.js o contenedor Java) que se comunique con Laravel vía socket local o API HTTP.</li>
+        <li><strong>Certificación:</strong> Transbank exige certificación para cada integración. El proceso puede tomar 2-4 semanas.</li>
+        <li><strong>Multi-plataforma:</strong> El POS corre en navegador (cualquier SO), pero el bridge con el terminal POS es dependiente del SO del operador.</li>
+        <li><strong>Sin demonios en cPanel:</strong> El bridge sería un proceso externo que debe ejecutarse en la máquina del operador, no en el servidor.</li>
+      </ul>
+
+      <h3>Arquitectura propuesta (futura)</h3>
+      <pre>┌─────────────┐    WebSocket     ┌──────────────┐    Puerto Serie    ┌──────────┐
+│  Laravel POS │◄──────────────►│  Bridge POS   │◄────────────────►│ Terminal  │
+│  (Navegador) │    localhost    │  (Node.js)    │    / Bluetooth    │ Transbank │
+└─────────────┘    :6001        └──────────────┘                   └──────────┘</pre>
+
+      <div class="warn-box">
+        <strong>Decisión pendiente:</strong> Evaluar si se usa la nueva API REST de Transbank (Webpay API 2.0) que permite integración sin SDK propietario, mediante QR dinámico y pago desde el teléfono del cliente, eliminando la necesidad del bridge local.
+      </div>
+    </article>
+
+    <article class="page" id="preguntas-facturacion-dte">
+      <div class="section-id">07 · Preguntas Abiertas</div>
+      <h2>Facturación DTE</h2>
+      <p class="lead">La facturación electrónica chilena (DTE) es obligatoria para la mayoría de los comercios. Su implementación requiere integración con el SII o un proveedor autorizado.</p>
+
+      <h3>Contexto legal</h3>
+      <p>Chile exige emisión de Documentos Tributarios Electrónicos (DTE) desde 2018 para la mayoría de los contribuyentes. Los tipos de documento relevantes son:</p>
+      <ul>
+        <li><strong>Boleta Electrónica:</strong> Para consumidores finales (sin RUT).</li>
+        <li><strong>Factura Electrónica:</strong> Para empresas (con RUT).</li>
+        <li><strong>Nota de Crédito/Débito:</strong> Para correcciones.</li>
+      </ul>
+
+      <h3>Opciones de integración</h3>
+      <table>
+        <tr><th>Proveedor</th><th>Tipo</th><th>Ventajas</th><th>Desventajas</th></tr>
+        <tr><td>SII Directo (libre)</td><td>API SOAP</td><td>Sin costo por transacción</td><td>Integración compleja, requiere firma electrónica, certificación SII</td></tr>
+        <tr><td>PayMe</td><td>API REST</td><td>SDK moderno, soporte local, precios competitivos</td><td>Costo mensual + por documento</td></tr>
+        <tr><td>Efact</td><td>API REST</td><td>Amplia adopción en Chile, buen soporte</td><td>Costo más alto</td></tr>
+        <tr><td>SimpleFact</td><td>API REST</td><td>Económico, API moderna</td><td>Menos trayectoria</td></tr>
+      </table>
+
+      <h3>Preguntas abiertas para decisión</h3>
+      <ul>
+        <li><strong>¿Se factura desde el POS o desde WooCommerce?</strong> Opción A: El POS emite la boleta/factura al momento de la venta presencial. Opción B: WooCommerce emite los DTE de pedidos web. Lo ideal sería ambos, pero duplica la integración.</li>
+        <li><strong>¿Timing de emisión?</strong> Inmediata (al pagar) vs. diferida (al despachar). La ley permite ambas, pero la inmediata es mejor para el cliente.</li>
+        <li><strong>¿Múltiples sucursales con un solo RUT?</strong> Si el cliente tiene un RUT para todas las sucursales, los DTE se emiten con ese RUT pero deben identificar la sucursal emisora en el detalle.</li>
+        <li><strong>¿RUT de cliente obligatorio?</strong> Para boletas no es obligatorio; para facturas sí. El POS debe manejar ambos flujos.</li>
+      </ul>
+
+      <div class="warn-box">
+        <strong>Decisión pendiente:</strong> Se recomienda integrar con un proveedor tipo PayMe para la Fase 2, ya que reduce drásticamente el tiempo de implementación comparado con la integración directa al SII. El costo por transacción se traslada al cliente como costo operacional.
+      </div>
+    </article>
+
+  </main>
+
+  <script src="js/navigation.js"></script>
+</body>
+</html>
