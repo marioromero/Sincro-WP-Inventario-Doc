@@ -387,26 +387,62 @@ class LocalLicenseStub implements LicenseValidator
     <article class="page" id="sincronizacion-reglas-verdad">
       <div class="section-id">03 · Sincronización WooCommerce</div>
       <h2>Reglas de Verdad</h2>
-      <p class="lead">Definición precisa de qué sistema es la fuente autoritativa para cada fragmento de datos, y cómo se resuelven los conflictos.</p>
+      <p class="lead">Definición precisa de qué sistema es la fuente autoritativa para cada fragmento de datos, y cómo se resuelven los conflictos cuando ambos sistemas modifican el mismo recurso.</p>
+
+      <h3>Stock: bidireccional con jerarquía POS</h3>
+      <p>El stock es bidireccional en el sentido de que ambos sistemas <em>pueden</em> modificarlo (WooCommerce descuenta stock cuando llega un pedido web, el POS descuenta cuando hay venta presencial), pero el POS <strong>siempre impone su valor sobre WooCommerce</strong> cuando hay discrepancia sobre la disponibilidad física local.</p>
+      <ul>
+        <li><strong>Venta POS:</strong> descuenta del Stock Ledger local y encola sync hacia WooCommerce.</li>
+        <li><strong>Pedido web:</strong> WooCommerce descuenta primero; al importar el pedido, el POS verifica y ajusta si el stock web estaba incorrecto.</li>
+        <li><strong>Ajuste de inventario:</strong> Siempre se hace en el POS y se propaga a WooCommerce. No se aceptan ajustes desde WooCommerce.</li>
+      </ul>
+
+      <h3>Catálogo: bidireccional con resolución de conflictos</h3>
+      <p>El catálogo de productos puede modificarse tanto desde el POS como desde WooCommerce. El desarrollador debe elegir una estrategia de resolución de conflictos e implementarla de forma consistente. Se documentan dos estrategias viables:</p>
+
+      <h4>Estrategia A: "Gana el timestamp más reciente"</h4>
+      <p>Cada modificación registra un campo <code>updated_at</code>. Al sincronizar, se compara el timestamp de ambos sistemas y el valor más reciente prevalece. Es la estrategia más simple pero puede perder cambios si hay diferencias de reloj entre servidores (&gt;5s de skew puede causar regresiones).</p>
+      <pre>// Pseudo-código: Estrategia A
+function resolveConflict(Product \$local, array \$wooData): array
+{
+    \$localTime = \$local->updated_at->timestamp;
+    \$wooTime = strtotime(\$wooData['date_modified']);
+
+    if (\$localTime >= \$wooTime) {
+        return \$local->toArray();  // POS gana
+    }
+    return \$wooData;  // WooCommerce gana
+}</pre>
+
+      <h4>Estrategia B: "Bloqueo de campos según origen"</h4>
+      <p>Cada campo del producto tiene un origen propietario definido en una tabla de mapeo. El POS es dueño de <code>sku</code>, <code>stock</code> y <code>price</code>. WooCommerce es dueño de <code>description</code>, <code>images</code> y <code>categories</code>. La sincronización respeta esa propiedad: nunca sobreescribe un campo cuyo origen es el otro sistema.</p>
+      <pre>// Config: field_ownership.php
+return [
+    'sku'         => 'pos',
+    'name'        => 'pos',
+    'price'       => 'pos',
+    'stock'       => 'pos',
+    'description' => 'woocommerce',
+    'images'      => 'woocommerce',
+    'categories'  => 'woocommerce',
+    'tags'        => 'woocommerce',
+];</pre>
+
+      <blockquote>
+        <strong>Trade-off:</strong> Estrategia A es más fácil de implementar y entender, pero vulnerable a desincronización de relojes. Estrategia B es más robusta pero requiere configuración explícita por campo y agregar un mecanismo de "reclamo de propiedad" si un operador necesita forzar la sobreescritura.
+      </blockquote>
 
       <h3>Fuente de verdad por dominio</h3>
       <table>
         <tr><th>Dato</th><th>Fuente de Verdad</th><th>Dirección Sync</th></tr>
-        <tr><td>Stock disponible (cantidad)</td><td>POS (Stock Ledger)</td><td>POS → WooCommerce (unidireccional)</td></tr>
-        <tr><td>Catálogo de productos (SKU, nombre, precio)</td><td>POS</td><td>POS → WooCommerce (unidireccional)</td></tr>
+        <tr><td>Stock disponible (cantidad)</td><td>POS (Stock Ledger)</td><td>POS → WooCommerce (jerarquía POS)</td></tr>
+        <tr><td>Catálogo — SKU, nombre, precio</td><td>POS</td><td>POS → WooCommerce (según estrategia elegida)</td></tr>
+        <tr><td>Catálogo — descripción, imágenes, categorías</td><td>WooCommerce</td><td>WooCommerce → POS (según estrategia elegida)</td></tr>
         <tr><td>Pedidos web (ordenes)</td><td>WooCommerce</td><td>WooCommerce → POS (unidireccional)</td></tr>
         <tr><td>Clientes</td><td>POS (tabla local customers)</td><td>Bidireccional — POS y WC se actualizan mutuamente</td></tr>
         <tr><td>Precios por sucursal</td><td>POS</td><td>POS → WooCommerce (mapeo por regla)</td></tr>
         <tr><td>Imágenes de productos</td><td>WooCommerce (Media Library)</td><td>WC → POS (referencia por URL)</td></tr>
       </table>
-
-      <h3>Reglas de resolución de conflictos</h3>
-      <ul>
-        <li><strong>Stock:</strong> WooCommerce nunca sobreescribe el stock del POS. Cualquier cambio de stock en WooCommerce (ej. devolución manual) se ignora a menos que un operador lo autorice explícitamente.</li>
-        <li><strong>Productos:</strong> El POS crea/actualiza productos y los empuja a WooCommerce. Si un producto existe solo en WooCommerce (creado directamente), se importa al POS como "no vinculado" y un administrador debe mapearlo manualmente.</li>
-        <li><strong>Pedidos web:</strong> Una vez importados al POS, los pedidos no se modifican retroactivamente desde WooCommerce. Si el estado cambia en WooCommerce, se registra como nota interna pero no altera el pedido en POS.</li>
-        <li><strong>Clientes:</strong> Regla de "última escritura gana" para datos básicos (nombre, teléfono, email). El POS es prioridad para datos locales (dirección de sucursal favorita).</li>
-      </ul>
 
       <h3>Gráfica de consistencia</h3>
       <p>El sistema opera en el espectro de <strong>consistencia eventual</strong>. No hay bloqueo distribuido ni transacciones distribuidas. La ventana de inconsistencia máxima esperada es:</p>
@@ -420,17 +456,18 @@ class LocalLicenseStub implements LicenseValidator
     <article class="page" id="sincronizacion-webhooks">
       <div class="section-id">03 · Sincronización WooCommerce</div>
       <h2>Webhooks y Sincronización</h2>
-      <p class="lead">Detalle del motor de sincronización: qué eventos se escuchan, cómo se procesan y cómo se garantiza resiliencia.</p>
+      <p class="lead">Detalle del motor de sincronización: eventos entrantes (webhooks), operaciones salientes (REST API asíncrona), y mecanismos de resiliencia.</p>
 
-      <h3>Webhooks entrantes (WooCommerce → POS)</h3>
-      <p>WooCommerce dispara webhooks POST hacia una ruta dedicada del POS cuando ocurren eventos específicos. El POS expone un endpoint público (protegido por secret compartido) que recibe y valida estas notificaciones.</p>
+      <h3>Integración Entrante: Webhooks (WooCommerce → POS)</h3>
+      <p>WooCommerce dispara webhooks POST hacia rutas dedicadas del POS cuando ocurren eventos. El POS expone endpoints públicos protegidos por un secreto compartido (HMAC-SHA256). Cada webhook se procesa dentro de un Job para no bloquear la respuesta HTTP a WooCommerce.</p>
 
       <table>
-        <tr><th>Evento WooCommerce</th><th>Hook POS</th><th>Acción</th></tr>
-        <tr><td>order.created</td><td>POST /api/webhooks/order-created</td><td>Importar pedido a tabla orders del POS con origen "web"</td></tr>
-        <tr><td>order.updated</td><td>POST /api/webhooks/order-updated</td><td>Actualizar estado del pedido en POS (si corresponde)</td></tr>
-        <tr><td>product.updated</td><td>POST /api/webhooks/product-updated</td><td>Re-sincronizar datos del producto si el POS lo permite</td></tr>
-        <tr><td>stock.updated</td><td>POST /api/webhooks/stock-updated</td><td>Registrar en log; no sobreescribe el stock del POS</td></tr>
+        <tr><th>Evento WooCommerce</th><th>Endpoint POS</th><th>Acción</th></tr>
+        <tr><td>order.created</td><td>POST /api/webhooks/order-created</td><td>Importar pedido como venta en estado <code>en_transito</code>. El pedido queda pendiente de asignación de sucursal (ruta de despacho).</td></tr>
+        <tr><td>order.updated</td><td>POST /api/webhooks/order-updated</td><td>Actualizar estado y notas internas del pedido en POS. No modifica líneas de detalle ni cantidades.</td></tr>
+        <tr><td>product.updated</td><td>POST /api/webhooks/product-updated</td><td>Re-sincronizar campos cuya propiedad pertenece a WooCommerce según la estrategia de resolución elegida (descripción, imágenes, categorías).</td></tr>
+        <tr><td>product.created</td><td>POST /api/webhooks/product-created</td><td>Importar producto como "no vinculado" al POS. Un administrador debe mapearlo manualmente a un producto existente o aprobar su creación.</td></tr>
+        <tr><td>stock.updated</td><td>POST /api/webhooks/stock-updated</td><td>Registrar en log de auditoría. No sobreescribe el Stock Ledger del POS. El POS forzará su valor en la siguiente sincronización.</td></tr>
       </table>
 
       <h3>Validación de webhooks</h3>
@@ -448,23 +485,83 @@ public function handle(Request \$request, Closure \$next)
     return \$next(\$request);
 }</pre>
 
-      <h3>Sincronización saliente (POS → WooCommerce)</h3>
-      <p>Los cambios originados en el POS se sincronizan hacia WooCommerce mediante Jobs encolados:</p>
+      <h3>Integración Saliente: REST API asíncrona (POS → WooCommerce)</h3>
+      <p>Los cambios originados en el POS nunca llaman a la API de WooCommerce de forma síncrona durante una request HTTP del usuario. Siempre se despachan Jobs a la cola <code>database</code>, garantizando que la operación POS no depende de la disponibilidad ni latencia de WooCommerce.</p>
+
       <table>
-        <tr><th>Acción POS</th><th>Job</th><th>Endpoint WooCommerce</th></tr>
-        <tr><td>Crear producto</td><td>SyncProductToWooCommerce</td><td>POST /wp-json/wc/v3/products</td></tr>
-        <tr><td>Actualizar stock</td><td>SyncStockToWooCommerce</td><td>PUT /wp-json/wc/v3/products/{id}</td></tr>
-        <tr><td>Transferencia entre sucursales</td><td>SyncTransferToWooCommerce</td><td>PUT /wp-json/wc/v3/products/{id}</td></tr>
-        <tr><td>Crear cliente</td><td>SyncCustomerToWooCommerce</td><td>POST /wp-json/wc/v3/customers</td></tr>
+        <tr><th>Evento POS</th><th>Job</th><th>Endpoint WooCommerce</th><th>Prioridad</th></tr>
+        <tr><td>Crear producto</td><td>SyncProductToWooCommerce</td><td>POST /wp-json/wc/v3/products</td><td>Normal</td></tr>
+        <tr><td>Actualizar stock por venta POS</td><td>SyncStockToWooCommerce</td><td>PUT /wp-json/wc/v3/products/{id}</td><td>Alta</td></tr>
+        <tr><td>Transferencia entre sucursales</td><td>SyncTransferToWooCommerce</td><td>PUT /wp-json/wc/v3/products/{id}</td><td>Normal</td></tr>
+        <tr><td>Crear/actualizar cliente</td><td>SyncCustomerToWooCommerce</td><td>POST /wp-json/wc/v3/customers</td><td>Baja</td></tr>
+        <tr><td>Actualizar precio</td><td>SyncPriceToWooCommerce</td><td>PUT /wp-json/wc/v3/products/{id}</td><td>Normal</td></tr>
       </table>
 
       <h3>Resiliencia del motor de sincronización</h3>
       <ul>
         <li><strong>Reintentos con backoff:</strong> 5 reintentos con backoff exponencial (30s, 2min, 5min, 15min, 30min).</li>
-        <li><strong>Dead Letter Queue:</strong> Jobs que fallan después de 5 intentos se mueven a tabla <code>failed_jobs</code>. Un comando artisan permite re-encolarlos manualmente.</li>
-        <li><strong>Idempotencia:</strong> Cada job incluye un UUID único. WooCommerce almacena el <code>X-Idempotency-Key</code> para evitar duplicados si el job se ejecuta más de una vez.</li>
-        <li><strong>Throttling:</strong> Respetamos los límites de rate de la API de WooCommerce (usualmente 25 requests por segundo). Usamos el middleware <code>throttle</code> de Laravel HTTP Client.</li>
+        <li><strong>Dead Letter Queue:</strong> Jobs que fallan después de 5 intentos se mueven a tabla <code>failed_jobs</code>. Un comando artisan (<code>php artisan sync:retry-all</code>) permite re-encolarlos manualmente.</li>
+        <li><strong>Idempotencia:</strong> Cada job incluye un UUID en el header <code>X-Idempotency-Key</code>. WooCommerce almacena esta clave por 24h para evitar duplicados si el job se ejecuta más de una vez.</li>
+        <li><strong>Throttling:</strong> Respetamos los límites de rate de la API (usualmente 25 req/s). Se usa el middleware <code>throttle</code> de Laravel HTTP Client con un semáforo por CanalWoo.</li>
+        <li><strong>Cola por prioridad:</strong> Los jobs de stock usan la cola <code>high</code>; los de clientes, <code>low</code>. El cron procesa primero <code>high</code> antes de tocar <code>low</code>.</li>
       </ul>
+    </article>
+
+    <!-- 3.3 Reconciliación de Stock -->
+    <article class="page" id="sincronizacion-reconciliacion">
+      <div class="section-id">03 · Sincronización WooCommerce</div>
+      <h2>Reconciliación de Stock</h2>
+      <p class="lead">Job programado que cruza el stock total del POS contra el stock registrado en WooCommerce para detectar discrepancias y forzar la sincronización.</p>
+
+      <h3>¿Por qué es necesaria?</h3>
+      <p>Incluso con un motor de sincronización robusto, pueden ocurrir discrepancias: un webhook no entregado, un job que falló y se perdió en la Dead Letter Queue, una modificación manual directa en WooCommerce, o un error de red transitorio que dejó una operación a medio camino. La reconciliación es la red de seguridad que detecta y corrige estos desajustes.</p>
+
+      <h3>Diseño del Job de Reconciliación</h3>
+      <p>Se implementa como un comando Artisan (<code>php artisan sync:reconcile-stock</code>) que se programa en el cron de cPanel para ejecutarse en ventanas de bajo tráfico (ej. 3:00 AM).</p>
+
+      <pre>// app/Console/Commands/ReconcileStock.php
+public function handle()
+{
+    // 1. Obtener todos los productos activos con mapeo WooCommerce
+    \$products = Product::whereHas('wooMapping')->get();
+
+    foreach (\$products as \$product) {
+        // 2. Obtener stock real desde el Ledger del POS
+        \$posStock = \$product->getStockTotal();  // suma de ledger (todas las sucursales)
+
+        // 3. Obtener stock desde API de WooCommerce
+        \$wooStock = Http::withToken(\$product->canalWoo->api_key)
+            ->get(\$product->canalWoo->api_url . '/products/' . \$product->wooMapping->woo_id)
+            ->json('stock_quantity');
+
+        // 4. Si discrepa, encolar job de corrección
+        if (\$posStock !== \$wooStock) {
+            Log::warning('Stock discrepancy detected', [
+                'sku' => \$product->sku,
+                'pos' => \$posStock,
+                'woo' => \$wooStock,
+            ]);
+            SyncStockToWooCommerce::dispatch(\$product)
+                ->onQueue('high');
+        }
+    }
+}</pre>
+
+      <h3>Configuración del Cron</h3>
+      <p>En cPanel, se agrega una entrada al cron job que ejecuta el comando una vez al día:</p>
+      <pre># Reconciliación diaria de stock — ejecutar a las 3:00 AM
+0 3 * * * /usr/local/bin/php /home/user/public_html/artisan sync:reconcile-stock >> /dev/null 2>&amp;1</pre>
+
+      <h3>Consideraciones de rendimiento</h3>
+      <ul>
+        <li>Para catálogos grandes (&gt;10,000 productos), la llamada individual a la API de WooCommerce por producto es lenta. Alternativa: usar <code>/wp-json/wc/v3/products?page=1&amp;per_page=100</code> y construir un mapa en memoria.</li>
+        <li>El job respeta el throttle de 25 req/s de WooCommerce. Si hay muchos productos con discrepancias, se encolan gradualmente.</li>
+        <li>Se recomienda monitorear el log de discrepancias: un volumen alto sostenido indica un problema sistémico (webhook caído, error de configuración).</li>
+      </ul>
+
+      <div class="info-box">
+        <strong>Nota:</strong> La reconciliación no reemplaza la sincronización en tiempo real. Es un complemento de verificación periódica. La sincronización vía webhooks + jobs sigue siendo el canal principal.
+      </div>
     </article>
 
     <!-- ================================================================ -->
@@ -474,79 +571,324 @@ public function handle(Request \$request, Closure \$next)
     <article class="page" id="inventario-stock-ledger">
       <div class="section-id">04 · Inventario y Catálogo</div>
       <h2>Stock Ledger</h2>
-      <p class="lead">El Stock Ledger es el corazón del inventario: un registro inmutable de cada movimiento de stock que afecta la cantidad disponible de un producto en una sucursal.</p>
+      <p class="lead">El Stock Ledger es el corazón del inventario: un registro inmutable y auditable de cada movimiento que afecta el stock de un producto en una sucursal. Prohibido usar un campo de texto plano para el stock actual.</p>
 
       <h3>Principios del Ledger</h3>
       <ul>
-        <li><strong>Inmutabilidad:</strong> Una vez registrado, un movimiento no se elimina ni modifica. Solo se compensa con un movimiento inverso.</li>
-        <li><strong>Auditabilidad:</strong> Cada movimiento tiene: quién (user_id), qué (product_id, sucursal_id), cuándo (created_at), por qué (reason enum), cuánto (quantity).</li>
-        <li><strong>Trazabilidad:</strong> Cada movimiento referencia el documento origen (venta, compra, transferencia, ajuste).</li>
+        <li><strong>Inmutabilidad:</strong> Una vez registrado, un movimiento no se elimina ni modifica. Solo se compensa con un movimiento inverso (ej. una venta anulada genera un movimiento de reversión).</li>
+        <li><strong>Auditabilidad:</strong> Cada movimiento captura: quién (user_id), qué (product_id, branch_id), cuándo (created_at), por qué (type enum + reason text), cuánto (quantity) y saldo resultante (balance_after).</li>
+        <li><strong>Trazabilidad:</strong> Cada movimiento referencia el documento origen mediante <code>reference_type</code> y <code>reference_id</code> (polimórfico).</li>
       </ul>
 
+      <h3>Tipos de Movimiento</h3>
+      <p>El enum <code>type</code> clasifica cada operación. Todos los tipos son transaccionales y se registran dentro de una transacción de base de datos junto con el documento que los origina:</p>
+      <table>
+        <tr><th>Tipo</th><th>Signo</th><th>Descripción</th><th>Documento origen</th></tr>
+        <tr><td><code>entrada</code></td><td>+</td><td>Ingreso de stock por compra o reposición desde proveedor</td><td>PurchaseOrder / Receipt</td></tr>
+        <tr><td><code>salida</code></td><td>−</td><td>Egreso de stock por devolución a proveedor o merma autorizada</td><td>Return / WastageNote</td></tr>
+        <tr><td><code>venta_pos</code></td><td>−</td><td>Descuento por venta presencial en sucursal</td><td>Sale (tipo pos)</td></tr>
+        <tr><td><code>venta_web</code></td><td>−</td><td>Descuento por pedido web importado desde WooCommerce</td><td>Sale (tipo web)</td></tr>
+        <tr><td><code>ajuste</code></td><td>±</td><td>Corrección manual de inventario (con razón obligatoria)</td><td>StockAdjustment</td></tr>
+        <tr><td><code>inicial</code></td><td>+</td><td>Saldo inicial al cargar el sistema por primera vez</td><td>InitialStock</td></tr>
+        <tr><td><code>transfer_out</code></td><td>−</td><td>Salida por transferencia a otra sucursal</td><td>Transfer (origen)</td></tr>
+        <tr><td><code>transfer_in</code></td><td>+</td><td>Entrada por recepción de transferencia</td><td>Transfer (destino)</td></tr>
+        <tr><td><code>reserva_en_transito</code></td><td>−</td><td>Reserva temporal de stock para un pedido web aún no confirmado</td><td>Sale (estado reservado)</td></tr>
+        <tr><td><code>reversion</code></td><td>±</td><td>Contrapartida de un movimiento anterior (ej. anulación de venta)</td><td>Original document ID</td></tr>
+      </table>
+
       <h3>Esquema conceptual</h3>
-      <pre>// Migración simplificada
-Schema::create('stock_ledger', function (Blueprint \$table) {
+      <pre>Schema::create('stock_ledger', function (Blueprint \$table) {
     \$table->id();
     \$table->foreignId('product_id')->constrained();
     \$table->foreignId('branch_id')->constrained('sucursales');
-    \$table->enum('type', ['sale', 'purchase', 'transfer_out', 'transfer_in',
-                           'adjustment', 'initial', 'return']);
+    \$table->string('type');  // ver tabla de tipos arriba
     \$table->integer('quantity');  // positivo = entrada, negativo = salida
-    \$table->integer('balance_after');  // saldo posterior al movimiento
+    \$table->integer('balance_after');  // saldo posterior, calculado al insertar
     \$table->foreignId('user_id')->constrained();
-    \$table->text('reference_type')->nullable();  // 'App\Models\Sale', etc.
-    \$table->unsignedBigInteger('reference_id')->nullable();
+    \$table->nullableMorphs('reference');  // referencia polimórfica al documento origen
     \$table->text('reason')->nullable();
     \$table->timestamps();
-    \$table->index(['product_id', 'branch_id']);
+
+    \$table->index(['product_id', 'branch_id', 'created_at']);
 });</pre>
 
       <h3>Cálculo del stock disponible</h3>
-      <p>No se almacena un campo "stock" calculado en la tabla de productos. El stock disponible se obtiene siempre agregando la tabla ledger:</p>
-      <pre>// app/Models/Product.php
-public function stockEnSucursal(Branch \$branch): int
+      <p>No se almacena un campo "stock" calculado. El stock se obtiene sumando la tabla ledger:</p>
+      <pre>public function stockEnSucursal(Branch \$branch): int
 {
-    return \$this->stockLedger()
+    return (int) \$this->stockLedger()
         ->where('branch_id', \$branch->id)
         ->sum('quantity');
 }</pre>
-      <p>Esto evita inconsistencias (desincronización entre el campo calculado y el ledger). Para rendimiento, se puede cachear el valor con <code>observe</code> y actualizar un campo denormalizado <code>stock_cache</code> si el volumen lo justifica.</p>
+
+      <p>Para el stock "disponible real" se excluyen las reservas en tránsito:</p>
+      <pre>public function stockDisponible(Branch \$branch): int
+{
+    return \$this->stockEnSucursal(\$branch)
+        - (int) \$this->stockLedger()
+            ->where('branch_id', \$branch->id)
+            ->where('type', 'reserva_en_transito')
+            ->sum('quantity');
+}</pre>
 
       <div class="info-box">
-        <strong>Nota de rendimiento:</strong> Para inventarios de &lt;100k movimientos por sucursal, la suma directa con índice compuesto es suficientemente rápida (&lt;50ms). Para volúmenes mayores, implementar tabla de resumen (<code>branch_product_stock</code>) actualizada por eventos.
+        <strong>Nota de rendimiento:</strong> Para inventarios de &lt;100k movimientos por sucursal, la suma directa con índice compuesto es suficientemente rápida (&lt;50ms). Para volúmenes mayores, implementar tabla de resumen (<code>branch_product_stock</code>) actualizada por eventos de dominio.
       </div>
     </article>
 
     <article class="page" id="inventario-sucursales">
       <div class="section-id">04 · Inventario y Catálogo</div>
-      <h2>Sucursales</h2>
-      <p class="lead">El modelo multi-sucursal es un pilar del dominio. Cada sucursal opera con su propio inventario, precios y configuración.</p>
+      <h2>Sucursales y Canales Web</h2>
+      <p class="lead">El modelo multi-sucursal se complementa con el concepto de "canal web": cada tienda WooCommerce conectada es un canal independiente con sus propias credenciales y configuración.</p>
 
-      <h3>Modelo de datos</h3>
-      <p>Las sucursales se modelan como una entidad separada (<code>branches</code>), no como un simple campo de texto. Cada sucursal tiene:</p>
+      <h3>Sucursales (Branches)</h3>
+      <p>Las sucursales se modelan como una entidad separada (<code>branches</code>), no como un simple campo de texto. Cada venta o movimiento pertenece siempre a una sucursal. La entidad almacena:</p>
       <ul>
-        <li>Datos de contacto (dirección, teléfono, email)</li>
-        <li>Horario de atención (JSON con rangos semanales)</li>
-        <li>Configuración POS (impresora por defecto, cajón de dinero, logo personalizado)</li>
-        <li>Lista de usuarios asignados (relación many-to-many con roles específicos por sucursal)</li>
-        <li>Precios propios (sobreescriben el precio base del producto)</li>
+        <li>Datos de contacto (dirección, teléfono, email, comuna, región)</li>
+        <li>Horario de atención (JSON con rangos semanales y excepciones festivas)</li>
+        <li>Configuración POS (impresora por defecto, cajón de dinero, logo personalizado, formato de ticket)</li>
+        <li>Usuarios asignados (relación many-to-many con roles específicos por sucursal)</li>
+        <li>Precios propios (sobreescriben el precio base del producto vía tabla pivot <code>branch_product</code>)</li>
         <li>Stock segregado (cada movimiento en el ledger pertenece a una sucursal)</li>
+        <li>Cobertura de despacho (relación con tabla de comunas para enrutamiento geográfico)</li>
+      </ul>
+
+      <h3>Canales Web (CanalWoo)</h3>
+      <p>Un cliente puede tener múltiples tiendas WooCommerce (ej. una tienda retail, una tienda B2B, una tienda para Chile y otra para Perú). Cada una se modela como un <code>CanalWoo</code> independiente:</p>
+
+      <pre>Schema::create('canal_woos', function (Blueprint \$table) {
+    \$table->id();
+    \$table->foreignId('branch_id')->constrained();  // sucursal default para pedidos
+    \$table->string('nombre');  // ej. "Tienda Retail", "Tienda B2B"
+    \$table->string('url');     // URL base de la tienda WooCommerce
+    \$table->string('api_key'); // Consumer Key (cifrado en reposo)
+    \$table->string('api_secret'); // Consumer Secret (cifrado en reposo)
+    \$table->string('webhook_secret'); // Secreto para validar webhooks entrantes
+    \$table->boolean('activo')->default(true);
+    \$table->json('config')->nullable();  // mapeo de estados, cola de prioridad, etc.
+    \$table->timestamps();
+});</pre>
+
+      <p>Cada producto puede tener un mapeo distinto a cada canal WooCommerce, ya que el ID del producto en WooCommerce difiere por tienda. Esto se modela con una tabla pivot:</p>
+
+      <pre>Schema::create('product_woo_mappings', function (Blueprint \$table) {
+    \$table->id();
+    \$table->foreignId('product_id')->constrained();
+    \$table->foreignId('canal_woo_id')->constrained();
+    \$table->unsignedBigInteger('woo_id');  // ID del producto en WooCommerce
+    \$table->string('woo_sku')->nullable(); // SKU en WooCommerce (puede diferir)
+    \$table->json('meta_data')->nullable();  // atributos extra de WooCommerce
+    \$table->timestamps();
+
+    \$table->unique(['product_id', 'canal_woo_id']);
+    \$table->unique(['canal_woo_id', 'woo_id']);
+});</pre>
+
+      <h3>Multi-sucursal + Multi-canal: reglas de negocio</h3>
+      <ul>
+        <li>Un <strong>CanalWoo</strong> pertenece a una sucursal por defecto. Los pedidos web de ese canal se asignan inicialmente a esa sucursal (luego puede reasignarse por ruta de despacho).</li>
+        <li>Cada <strong>CanalWoo</strong> tiene sus propias credenciales API y su propio webhook secret. La sincronización itera por canal.</li>
+        <li>Un producto puede estar publicado en múltiples canales WooCommerce, cada uno con su propio ID remoto y posiblemente SKU diferente.</li>
+        <li>La reconciliación de stock se ejecuta por canal: el stock total del POS se distribuye según la configuración de cada canal (ej. Canal A recibe el 100% del stock de sucursal 1; Canal B recibe la suma de sucursales 1 y 2).</li>
       </ul>
 
       <h3>Transferencias entre sucursales</h3>
-      <p>El flujo de transferencia sigue un proceso de dos pasos:</p>
+      <p>El flujo de transferencia sigue un proceso de dos pasos (origen y destino):</p>
       <ol>
-        <li><strong>Salida (origen):</strong> Se registra un movimiento <code>transfer_out</code> en la sucursal A, reduciendo su stock. El producto queda en estado "en tránsito".</li>
-        <li><strong>Entrada (destino):</strong> Cuando la sucursal B confirma recepción, se registra un movimiento <code>transfer_in</code> que incrementa el stock. Firma digital del receptor opcional.</li>
+        <li><strong>Salida (origen):</strong> Se registra <code>transfer_out</code> en la sucursal A. El producto queda "en tránsito".</li>
+        <li><strong>Entrada (destino):</strong> Cuando la sucursal B confirma recepción, se registra <code>transfer_in</code>. Firma digital del receptor opcional.</li>
       </ol>
+    </article>
 
-      <h3>Reglas de dominio sobre sucursales</h3>
-      <ul>
-        <li>Un producto puede existir sin stock en una sucursal (aparece en catálogo pero no disponible).</li>
-        <li>Los precios por sucursal son opcionales. Si no se definen, se usa el precio base del producto.</li>
-        <li>Un usuario puede tener roles diferentes en distintas sucursales (ej. Vendedor en Sucursal A, Supervisor en Sucursal B).</li>
-        <li>El stock global (todas las sucursales) se usa solo para reportes; la operación diaria siempre es por sucursal.</li>
-      </ul>
+    <!-- 4.3 Diagrama Entidad-Relación -->
+    <article class="page" id="inventario-erd">
+      <div class="section-id">04 · Inventario y Catálogo</div>
+      <h2>Diagrama Entidad-Relación</h2>
+      <p class="lead">Modelo de datos del núcleo del sistema: entidades principales, sus atributos clave y relaciones.</p>
+
+      <div class="diagram-container">
+        <svg viewBox="0 0 1050 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama entidad-relación del sistema POS+Inventario">
+
+          <defs>
+            <marker id="arrow-1n" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M 0 0 L 12 6 L 0 12 z" fill="#888"/>
+            </marker>
+            <marker id="crow-1n" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+              <line x1="0" y1="0" x2="12" y2="6" stroke="#888" stroke-width="1.2"/>
+              <line x1="0" y1="12" x2="12" y2="6" stroke="#888" stroke-width="1.2"/>
+            </marker>
+          </defs>
+
+          <!-- ===== ROW 1 ===== -->
+
+          <!-- User -->
+          <rect x="30" y="30" width="170" height="105" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
+          <rect x="30" y="30" width="170" height="26" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
+          <text x="115" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">User</text>
+          <text x="45" y="73" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK id: bigint</text>
+          <text x="45" y="87" font-family="Arial, sans-serif" font-size="9.5" fill="#555">name: string</text>
+          <text x="45" y="101" font-family="Arial, sans-serif" font-size="9.5" fill="#555">email: string (unique)</text>
+          <text x="45" y="115" font-family="Arial, sans-serif" font-size="9.5" fill="#555">password: hashed</text>
+          <text x="45" y="129" font-family="Arial, sans-serif" font-size="9" fill="#999">+ timestamps</text>
+
+          <!-- Role -->
+          <rect x="260" y="30" width="160" height="85" rx="8" fill="#f3e5f5" stroke="#ce93d8" stroke-width="1.5"/>
+          <rect x="260" y="30" width="160" height="26" rx="8" fill="#e1bee7" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="340" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Role</text>
+          <text x="275" y="73" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK id: bigint</text>
+          <text x="275" y="87" font-family="Arial, sans-serif" font-size="9.5" fill="#555">name: string (unique)</text>
+          <text x="275" y="101" font-family="Arial, sans-serif" font-size="9.5" fill="#555">guard_name: string</text>
+
+          <!-- Sucursal -->
+          <rect x="480" y="30" width="180" height="105" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <rect x="480" y="30" width="180" height="26" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
+          <text x="570" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Sucursal</text>
+          <text x="495" y="73" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK id: bigint</text>
+          <text x="495" y="87" font-family="Arial, sans-serif" font-size="9.5" fill="#555">nombre: string</text>
+          <text x="495" y="101" font-family="Arial, sans-serif" font-size="9.5" fill="#555">direccion: text</text>
+          <text x="495" y="115" font-family="Arial, sans-serif" font-size="9.5" fill="#555">comuna: string</text>
+          <text x="495" y="129" font-family="Arial, sans-serif" font-size="9" fill="#999">config: json</text>
+
+          <!-- CanalWoo -->
+          <rect x="720" y="30" width="210" height="105" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
+          <rect x="720" y="30" width="210" height="26" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="825" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">CanalWoo</text>
+          <text x="735" y="73" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK id: bigint</text>
+          <text x="735" y="87" font-family="Arial, sans-serif" font-size="9.5" fill="#555">nombre: string</text>
+          <text x="735" y="101" font-family="Arial, sans-serif" font-size="9.5" fill="#555">FK branch_id: bigint</text>
+          <text x="735" y="115" font-family="Arial, sans-serif" font-size="9.5" fill="#555">api_key: encrypted</text>
+          <text x="735" y="129" font-family="Arial, sans-serif" font-size="9" fill="#999">webhook_secret: encrypted</text>
+
+          <!-- ===== ROW 2 ===== -->
+
+          <!-- Product -->
+          <rect x="30" y="220" width="190" height="105" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <rect x="30" y="220" width="190" height="26" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
+          <text x="125" y="238" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Product</text>
+          <text x="45" y="263" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK id: bigint</text>
+          <text x="45" y="277" font-family="Arial, sans-serif" font-size="9.5" fill="#555">sku: string (unique)</text>
+          <text x="45" y="291" font-family="Arial, sans-serif" font-size="9.5" fill="#555">nombre: string</text>
+          <text x="45" y="305" font-family="Arial, sans-serif" font-size="9.5" fill="#555">precio_base: decimal</text>
+          <text x="45" y="319" font-family="Arial, sans-serif" font-size="9" fill="#999">+ variantes, atributos</text>
+
+          <!-- Customer -->
+          <rect x="280" y="220" width="180" height="105" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
+          <rect x="280" y="220" width="180" height="26" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="370" y="238" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Customer</text>
+          <text x="295" y="263" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK id: bigint</text>
+          <text x="295" y="277" font-family="Arial, sans-serif" font-size="9.5" fill="#555">rut: encrypted (unique)</text>
+          <text x="295" y="291" font-family="Arial, sans-serif" font-size="9.5" fill="#555">nombre: string</text>
+          <text x="295" y="305" font-family="Arial, sans-serif" font-size="9.5" fill="#555">email: encrypted</text>
+          <text x="295" y="319" font-family="Arial, sans-serif" font-size="9" fill="#999">telefono: encrypted</text>
+
+          <!-- Sale -->
+          <rect x="520" y="220" width="180" height="105" rx="8" fill="#f3e5f5" stroke="#ce93d8" stroke-width="1.5"/>
+          <rect x="520" y="220" width="180" height="26" rx="8" fill="#e1bee7" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="610" y="238" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">Sale</text>
+          <text x="535" y="263" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK id: bigint</text>
+          <text x="535" y="277" font-family="Arial, sans-serif" font-size="9.5" fill="#555">total: decimal</text>
+          <text x="535" y="291" font-family="Arial, sans-serif" font-size="9.5" fill="#555">estado: enum</text>
+          <text x="535" y="305" font-family="Arial, sans-serif" font-size="9.5" fill="#555">FK branch_id: bigint</text>
+          <text x="535" y="319" font-family="Arial, sans-serif" font-size="9" fill="#999">origen: pos|web</text>
+
+          <!-- ===== ROW 3 ===== -->
+
+          <!-- StockMovement -->
+          <rect x="30" y="410" width="240" height="105" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
+          <rect x="30" y="410" width="240" height="26" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
+          <text x="150" y="428" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">StockMovement</text>
+          <text x="45" y="453" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK id: bigint</text>
+          <text x="45" y="467" font-family="Arial, sans-serif" font-size="9.5" fill="#555">FK product_id, FK branch_id</text>
+          <text x="45" y="481" font-family="Arial, sans-serif" font-size="9.5" fill="#555">type: enum (10 tipos)</text>
+          <text x="45" y="495" font-family="Arial, sans-serif" font-size="9.5" fill="#555">quantity: integer (±)</text>
+          <text x="45" y="509" font-family="Arial, sans-serif" font-size="9" fill="#999">balance_after: integer</text>
+
+          <!-- BranchProduct (pivot) -->
+          <rect x="340" y="410" width="200" height="85" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.2" stroke-dasharray="4,3"/>
+          <rect x="340" y="410" width="200" height="26" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.2" stroke-dasharray="4,3"/>
+          <text x="440" y="428" text-anchor="middle" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" fill="#00695c">branch_product</text>
+          <text x="355" y="453" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK: (branch_id, product_id)</text>
+          <text x="355" y="467" font-family="Arial, sans-serif" font-size="9.5" fill="#555">precio: decimal (nullable)</text>
+          <text x="355" y="481" font-family="Arial, sans-serif" font-size="9.5" fill="#555">stock_minimo: integer</text>
+
+          <!-- ProductWooMapping (pivot) -->
+          <rect x="610" y="410" width="230" height="85" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.2" stroke-dasharray="4,3"/>
+          <rect x="610" y="410" width="230" height="26" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.2" stroke-dasharray="4,3"/>
+          <text x="725" y="428" text-anchor="middle" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" fill="#e65100">product_woo_mappings</text>
+          <text x="625" y="453" font-family="Arial, sans-serif" font-size="9.5" fill="#555">PK: (product_id, canal_woo_id)</text>
+          <text x="625" y="467" font-family="Arial, sans-serif" font-size="9.5" fill="#555">woo_id: bigint (ID remoto)</text>
+          <text x="625" y="481" font-family="Arial, sans-serif" font-size="9.5" fill="#555">woo_sku: string (nullable)</text>
+
+          <!-- ===== RELATIONSHIPS ===== -->
+
+          <!-- User N:M Role (pivot) -->
+          <line x1="200" y1="65" x2="260" y2="65" stroke="#888" stroke-width="1" marker-end="url(#crow-1n)"/>
+          <line x1="200" y1="85" x2="260" y2="85" stroke="#888" stroke-width="1"/>
+          <text x="230" y="55" text-anchor="middle" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">N:M</text>
+
+          <!-- User N:M Sucursal (pivot) -->
+          <line x1="200" y1="100" x2="480" y2="100" stroke="#888" stroke-width="1" marker-end="url(#arrow-1n)"/>
+          <line x1="200" y1="115" x2="480" y2="115" stroke="#888" stroke-width="1"/>
+          <text x="340" y="82" text-anchor="middle" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">N:M (con rol por sucursal)</text>
+
+          <!-- Sucursal 1:N CanalWoo -->
+          <line x1="660" y1="95" x2="720" y2="82" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
+          <text x="690" y="70" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">1:N</text>
+
+          <!-- Product N:M CanalWoo via pivot -->
+          <line x1="220" y1="280" x2="610" y2="448" stroke="#888" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="400" y="390" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">N:M (via product_woo_mappings)</text>
+
+          <!-- Product N:M Sucursal via branch_product (prices) -->
+          <line x1="220" y1="290" x2="340" y2="448" stroke="#888" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="265" y="395" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">N:M (precios)</text>
+
+          <!-- Product 1:N StockMovement -->
+          <line x1="60" y1="325" x2="120" y2="410" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
+          <text x="85" y="380" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">1:N</text>
+
+          <!-- Sucursal 1:N StockMovement -->
+          <line x1="570" y1="135" x2="250" y2="450" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="420" y="315" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">1:N</text>
+
+          <!-- Sucursal 1:N Sale -->
+          <line x1="570" y1="135" x2="610" y2="220" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
+          <text x="578" y="185" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">1:N</text>
+
+          <!-- Customer 1:N Sale -->
+          <line x1="460" y1="280" x2="520" y2="280" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
+          <text x="490" y="270" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">1:N</text>
+
+          <!-- Sale references StockMovement (polymorphic) -->
+          <line x1="610" y1="325" x2="250" y2="480" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="435" y="420" font-family="Arial, sans-serif" font-size="8.5" font-style="italic" fill="#888">referencia polimórfica</text>
+
+          <!-- StockMovement references Product -->
+          <line x1="270" y1="460" x2="310" y2="400" stroke="#888" stroke-width="0.5" stroke-dasharray="2,2" opacity="0"/>
+
+          <!-- Logo / version -->
+          <text x="30" y="710" font-family="Arial, sans-serif" font-size="8" fill="#999">Diagrama ERD — POS + Inventario Multi-Sucursal v1.0 (MVP)</text>
+          <rect x="890" y="700" width="8" height="8" rx="2" fill="#e0f7fa" stroke="#80deea" stroke-width="1"/>
+          <text x="902" y="708" font-family="Arial, sans-serif" font-size="7" fill="#888"> Entidad</text>
+          <rect x="960" y="700" width="8" height="8" rx="2" fill="#fff" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="972" y="708" font-family="Arial, sans-serif" font-size="7" fill="#888"> Tabla Pivot</text>
+        </svg>
+      </div>
+
+      <h3>Leyenda de relaciones</h3>
+      <table>
+        <tr><th>Relación</th><th>Cardinalidad</th><th>Descripción</th></tr>
+        <tr><td>User ↔ Role</td><td>N:M</td><td>Un usuario puede tener múltiples roles; un rol puede asignarse a múltiples usuarios.</td></tr>
+        <tr><td>User ↔ Sucursal</td><td>N:M</td><td>Un usuario opera en múltiples sucursales, con un rol específico en cada una.</td></tr>
+        <tr><td>Sucursal → CanalWoo</td><td>1:N</td><td>Una sucursal puede tener múltiples canales WooCommerce asociados.</td></tr>
+        <tr><td>Product ↔ CanalWoo</td><td>N:M</td><td>Un producto se publica en múltiples canales; cada canal tiene su propio ID remoto (vía pivot).</td></tr>
+        <tr><td>Product ↔ Sucursal</td><td>N:M</td><td>Un producto puede tener precios distintos por sucursal (vía pivot branch_product).</td></tr>
+        <tr><td>Product → StockMovement</td><td>1:N</td><td>Un producto tiene muchos movimientos de stock en el ledger.</td></tr>
+        <tr><td>Sucursal → StockMovement</td><td>1:N</td><td>Cada movimiento de stock pertenece a una sucursal.</td></tr>
+        <tr><td>Sucursal → Sale</td><td>1:N</td><td>Cada venta pertenece a una sucursal.</td></tr>
+        <tr><td>Customer → Sale</td><td>1:N</td><td>Un cliente puede tener muchas ventas (historial de compras).</td></tr>
+        <tr><td>Sale → StockMovement</td><td>1:N</td><td>Referencia polimórfica: cada venta genera movimientos en el ledger.</td></tr>
+      </table>
     </article>
 
     <!-- ================================================================ -->
@@ -556,52 +898,43 @@ public function stockEnSucursal(Branch \$branch): int
     <article class="page" id="ventas-rutas-despacho">
       <div class="section-id">05 · Ventas y Pedidos Web</div>
       <h2>Rutas de Despacho</h2>
-      <p class="lead">Los pedidos web importados desde WooCommerce requieren asignación a una sucursal para su preparación y despacho. Este proceso se modela como "Ruta de Despacho".</p>
+      <p class="lead">Los pedidos web importados desde WooCommerce requieren asignación a una sucursal para su preparación y despacho. El MVP soporta dos modos de asignación, y un tercero queda en backlog.</p>
 
-      <h3>Modelo conceptual</h3>
-      <p>Cuando un pedido llega desde WooCommerce, el sistema intenta asignarlo automáticamente a la sucursal más cercana al domicilio del cliente según la comuna de envío. Si no hay coincidencia, el pedido queda en "buzón de asignación" para que un supervisor lo asigne manualmente.</p>
+      <h3>Modo A: Sucursal fija / Bodega central</h3>
+      <p><strong>Configuración:</strong> Todo pedido web se asigna automáticamente a una sucursal específica (la "bodega central" o "sucursal de despacho") configurada en el CanalWoo.</p>
+      <p><strong>Cuándo usarlo:</strong> Clientes con una sola sucursal operativa que centraliza todos los despachos, o clientes que tercerizan la logística y solo necesitan consolidar pedidos en un punto.</p>
+      <p><strong>Implementación:</strong> El campo <code>canal_woos.branch_id</code> se usa como sucursal de despacho default. No hay intervención manual.</p>
 
-      <h3>Lógica de asignación automática</h3>
-      <pre>// Pseudo-código de la asignación
-function asignarSucursal(PedidoWeb \$pedido): Branch
-{
-    // 1. Obtener comuna de envío desde el pedido de WooCommerce
-    \$comuna = \$pedido->shipping_address['city'];
+      <h3>Modo B: Selección manual por supervisor</h3>
+      <p><strong>Configuración:</strong> Los pedidos web llegan en estado <code>pending_assignment</code> y aparecen en un "buzón de asignación" del panel POS. Un supervisor selecciona manualmente la sucursal de preparación y despacho.</p>
+      <p><strong>Cuándo usarlo:</strong> Clientes con múltiples sucursales donde la decisión de despacho depende de factores no modelados (disponibilidad de personal, horarios, tipo de producto).</p>
+      <p><strong>Implementación:</strong> El supervisor ve una lista de pedidos no asignados con datos del cliente y productos. Selecciona una sucursal y el pedido pasa a estado <code>assigned</code>.</p>
 
-    // 2. Buscar sucursal con cobertura en esa comuna
-    \$sucursal = Branch::whereHas('coberturas', fn(\$q) =>
-        \$q->where('comuna', \$comuna)
-          ->where('activa', true)
-    )->first();
+      <h3>Modo C: Enrutamiento geográfico (backlog Fase 2)</h3>
+      <p><strong>Concepto:</strong> El sistema asigna automáticamente el pedido a la sucursal más cercana al domicilio del cliente según la comuna de envío, usando una tabla de cobertura por sucursal.</p>
+      <p><strong>Por qué no está en el MVP:</strong> Requiere mantener una base de datos de comunas y cobertura por sucursal, manejar excepciones (sucursal sin stock del producto), y validar direcciones. Es una funcionalidad deseable pero no crítica para la operación inicial.</p>
 
-    // 3. Si hay resultado, asignar
-    if (\$sucursal) return \$sucursal;
-
-    // 4. Fallback: asignar a sucursal por defecto del cliente
-    \$sucursal = \$pedido->cliente->sucursalPreferida;
-    if (\$sucursal) return \$sucursal;
-
-    // 5. Último recurso: sucursal principal (configurable)
-    return Branch::where('es_principal', true)->first();
-}</pre>
+      <blockquote>
+        <strong>Implementación futura:</strong> Cuando se active el Modo C, la asignación automática evaluará primero cobertura geográfica, luego disponibilidad de stock, y finalmente reglas de negocio (costo de despacho, tiempo estimado). El Modo B se usará como fallback si la asignación automática no encuentra candidata.
+      </blockquote>
 
       <h3>Estados de una ruta de despacho</h3>
       <table>
-        <tr><th>Estado</th><th>Descripción</th></tr>
-        <tr><td>pending_assignment</td><td>Pedido web importado, esperando asignación a sucursal</td></tr>
-        <tr><td>assigned</td><td>Asignado a sucursal, pendiente de preparación</td></tr>
-        <tr><td>preparing</td><td>Bodeguero está armando el pedido</td></tr>
-        <tr><td>ready_for_pickup</td><td>Listo para retiro en sucursal</td></tr>
-        <tr><td>in_delivery</td><td>En ruta de despacho a domicilio</td></tr>
-        <tr><td>delivered</td><td>Entregado al cliente</td></tr>
-        <tr><td>cancelled</td><td>Cancelado (con nota de razón)</td></tr>
+        <tr><th>Estado</th><th>Descripción</th><th>Visible al cliente en WC</th></tr>
+        <tr><td>pending_assignment</td><td>Pedido web importado, esperando asignación a sucursal</td><td>Procesando</td></tr>
+        <tr><td>assigned</td><td>Asignado a sucursal, pendiente de preparación</td><td>Procesando</td></tr>
+        <tr><td>preparing</td><td>Bodeguero está armando el pedido</td><td>Procesando</td></tr>
+        <tr><td>ready_for_pickup</td><td>Listo para retiro en sucursal</td><td>Listo para retiro</td></tr>
+        <tr><td>in_delivery</td><td>En ruta de despacho a domicilio</td><td>En camino</td></tr>
+        <tr><td>delivered</td><td>Entregado al cliente</td><td>Completado</td></tr>
+        <tr><td>cancelled</td><td>Cancelado (con nota de razón)</td><td>Cancelado</td></tr>
       </table>
 
       <h3>Integración con WooCommerce</h3>
-      <p>Cuando un pedido cambia de estado en el POS (ej. a "delivered"), el sistema actualiza el estado del pedido en WooCommerce mediante la API REST, permitiendo que el cliente vea el progreso desde su cuenta de WooCommerce.</p>
+      <p>Cada cambio de estado en el POS actualiza el estado del pedido en WooCommerce mediante la API REST y, opcionalmente, agrega una nota privada visible para el administrador de la tienda.</p>
 
       <div class="warn-box">
-        <strong>MVP vs futuro:</strong> En el MVP, las rutas de despacho se gestionan manualmente desde el panel POS. La integración con servicios externos de tracking (Chilexpress, Starken, Bluexpress) queda para fases posteriores.
+        <strong>MVP vs futuro:</strong> En el MVP, las rutas de despacho se gestionan manualmente (Modo A o B). La integración con servicios externos de tracking (Chilexpress, Starken, Bluexpress) queda para fases posteriores.
       </div>
     </article>
 
@@ -611,68 +944,192 @@ function asignarSucursal(PedidoWeb \$pedido): Branch
 
     <article class="page" id="cumplimiento-privacidad">
       <div class="section-id">06 · Cumplimiento y Seguridad</div>
-      <h2>Privacidad (Ley 21.719)</h2>
-      <p class="lead">La Ley 21.719 (ley chilena de protección de datos personales, que modifica la Ley 19.628) exige que cualquier sistema que procese datos de ciudadanos chilenos implemente medidas específicas de privacidad desde el diseño.</p>
+      <h2>Privacidad por Diseño (Ley 21.719)</h2>
+      <p class="lead">La Ley 21.719 (modificación a la Ley 19.628 de protección de datos personales en Chile) exige que cualquier sistema que procese datos de ciudadanos chilenos implemente privacidad desde el diseño y por defecto. A continuación, las directrices concretas para el módulo de clientes.</p>
 
-      <h3>Obligaciones aplicables</h3>
-      <table>
-        <tr><th>Requisito</th><th>Implementación</th></tr>
-        <tr><td>Consentimiento explícito</td><td>Checkbox separado en registro de clientes; no pre-seleccionado. Registro de consentimiento con fecha y versión de política.</td></tr>
-        <tr><td>Derecho de acceso, rectificación, cancelación y oposición (ARCO)</td><td>API de exportación de datos personales por cliente. Endpoint de eliminación lógica (soft-delete con anonimización).</td></tr>
-        <tr><td>Portabilidad</td><td>Exportación JSON de datos del cliente descargable desde el perfil.</td></tr>
-        <tr><td>Seguridad de datos</td><td>Encriptación en reposo (AES-256 para datos sensibles), TLS 1.3 en tránsito, hashing de contraseñas con bcrypt.</td></tr>
-        <tr><td>Notificación de brechas</td><td>Log de accesos a datos personales. Alerta automática al administrador ante patrones anómalos.</td></tr>
-        <tr><td>Periodo de retención</td><td>Configurable por tipo de dato. Política de purga automática tras 5 años sin actividad.</td></tr>
-      </table>
+      <h3>Minimización de datos</h3>
+      <p>El sistema solo debe recolectar los datos estrictamente necesarios para la operación comercial. Los campos obligatorios del formulario de registro son: <strong>RUT</strong> (para facturación), <strong>nombre</strong>, <strong>email</strong> (para comunicación) y <strong>teléfono</strong> (para despacho). Dirección, fecha de nacimiento, género y otros datos demográficos son opcionales y deben recolectarse con consentimiento explícito adicional.</p>
 
-      <h3>Datos sensibles identificados</h3>
+      <h3>Cifrado en reposo de campos sensibles</h3>
+      <p>Tres campos se consideran datos sensibles y deben almacenarse cifrados con AES-256 usando una clave por instalación almacenada fuera de la base de datos (variable de entorno <code>APP_DATA_KEY</code>):</p>
       <ul>
-        <li>RUT/DNI del cliente (encriptado en reposo con <code>lakm/laravel-encrypted-trait</code>)</li>
-        <li>Dirección de envío y facturación</li>
-        <li>Teléfono y email</li>
-        <li>Historial de compras (se mantiene pero se anonimiza el vínculo a persona natural tras la purga)</li>
+        <li><strong>RUT/DNI:</strong> Cifrado con <code>lakm/laravel-encrypted-trait</code>. Se indexa el hash del RUT para búsquedas únicas.</li>
+        <li><strong>Email:</strong> Cifrado en reposo. Se almacena un hash SHA-256 en una columna auxiliar para búsquedas por login.</li>
+        <li><strong>Teléfono:</strong> Cifrado en reposo. No se indexa para búsqueda.</li>
       </ul>
 
+      <pre>// Ejemplo: Customer model con cifrado
+use LakM\LaravelEncrypted\Traits\HasEncryptedAttributes;
+
+class Customer extends Model
+{
+    use HasEncryptedAttributes;
+
+    protected \$encrypted = ['rut', 'email', 'phone'];
+
+    // Hash para búsquedas únicas por RUT
+    public function setRutAttribute(\$value)
+    {
+        \$this->attributes['rut'] = encrypt(\$value);
+        \$this->attributes['rut_hash'] = hash('sha256', \$value);
+    }
+
+    public function scopeFindByRut(\$query, \$rut)
+    {
+        return \$query->where('rut_hash', hash('sha256', \$rut));
+    }
+}</pre>
+
+      <h3>Consentimiento explícito</h3>
+      <p>El sistema debe registrar en la base de datos el consentimiento del cliente para cada finalidad de uso de sus datos:</p>
+
+      <pre>Schema::create('customer_consents', function (Blueprint \$table) {
+    \$table->id();
+    \$table->foreignId('customer_id')->constrained()->cascadeOnDelete();
+    \$table->string('purpose');  // 'marketing', 'data_processing', 'sharing_third_party'
+    \$table->boolean('granted');
+    \$table->string('ip_address')->nullable();
+    \$table->string('policy_version');  // versión de la política de privacidad al momento del consentimiento
+    \$table->timestamps();
+});</pre>
+
+      <ul>
+        <li>El check de consentimiento no puede venir pre-seleccionado.</li>
+        <li>El cliente puede revocar su consentimiento en cualquier momento desde su perfil.</li>
+        <li>La revocación no invalida el procesamiento previo, pero detiene el uso futuro.</li>
+      </ul>
+
+      <h3>Derecho al Olvido (eliminación / anonimización)</h3>
+      <p>El sistema debe exponer un endpoint (API y UI) para que el cliente solicite la eliminación de sus datos. El proceso sigue estos pasos:</p>
+      <ol>
+        <li>El cliente (o un administrador en su nombre) inicia la solicitud.</li>
+        <li>El sistema verifica que no existan obligaciones legales que impidan la eliminación (ej. facturas emitidas que requieren retención de datos por 5 años).</li>
+        <li>Si hay obligaciones, los datos del cliente se <strong>anonimizan</strong>: se reemplazan nombre, email, teléfono y RUT por valores irreversibles (ej. "Cliente Anonimizado #123", "anon-xxxxx@anonymous.com").</li>
+        <li>Si no hay obligaciones, se eliminan los registros del cliente y se anonimizan las referencias en ventas históricas.</li>
+        <li>Se registra en un log de auditoría la acción con fecha, operador y alcance.</li>
+      </ol>
+
+      <pre>// CustomerController
+public function requestForget(Customer \$customer)
+{
+    \$hasInvoices = \$customer->sales()
+        ->whereNotNull('dte_uuid')
+        ->exists();
+
+    if (\$hasInvoices) {
+        // Anonimizar en lugar de eliminar
+        \$customer->anonymize();
+        return response()->json(['message' => 'Datos anonimizados. Facturas retenidas por obligación legal.']);
+    }
+
+    // Eliminación completa
+    \$customer->delete();
+    return response()->json(['message' => 'Solicitud completada. Datos eliminados.']);
+}</pre>
+
+      <h3>Derecho de rectificación</h3>
+      <p>El cliente puede actualizar sus datos personales directamente desde su perfil. Cada cambio queda registrado en una tabla <code>customer_data_changes</code> con el valor anterior, el nuevo valor, la fecha y el IP desde donde se realizó el cambio. Esto permite reconstruir el historial de modificaciones en caso de disputa.</p>
+
+      <h3>Obligaciones aplicables (resumen)</h3>
+      <table>
+        <tr><th>Requisito</th><th>Implementación</th></tr>
+        <tr><td>Consentimiento explícito</td><td>Checkbox separado, no pre-seleccionado. Registro con finalidad, IP y versión de política.</td></tr>
+        <tr><td>Derecho ARCO (acceso, rectificación, cancelación, oposición)</td><td>API de exportación JSON. Endpoint de rectificación. Endpoint de olvido con anonimización.</td></tr>
+        <tr><td>Portabilidad</td><td>Exportación JSON completa de datos del cliente descargable desde el perfil.</td></tr>
+        <tr><td>Seguridad de datos</td><td>AES-256 en reposo para RUT, email, teléfono. TLS 1.3 en tránsito. bcrypt para passwords.</td></tr>
+        <tr><td>Notificación de brechas</td><td>Log de accesos a datos personales. Alerta al administrador ante patrones anómalos.</td></tr>
+        <tr><td>Periodo de retención</td><td>Configurable por tipo de dato. Purga automática tras 5 años sin actividad.</td></tr>
+      </table>
+
       <div class="info-box">
-        <strong>Nota:</strong> Esta documentación no constituye asesoría legal. Se recomienda que un abogado especialista en protección de datos revise el cumplimiento específico para cada instalación.
+        <strong>Nota:</strong> Esta documentación constituye una guía técnica de implementación, no asesoría legal. Se recomienda que un abogado especialista en protección de datos revise el cumplimiento específico para cada instalación.
       </div>
     </article>
 
     <article class="page" id="cumplimiento-roles">
       <div class="section-id">06 · Cumplimiento y Seguridad</div>
-      <h2>Roles y Permisos</h2>
-      <p class="lead">Modelo de autorización basado en roles con granularidad a nivel de sucursal. No hay superusuarios globales por defecto.</p>
+      <h2>Matriz de Roles MVP</h2>
+      <p class="lead">Tres roles acumulativos en el MVP — cada rol hereda los permisos del nivel anterior. El alcance siempre está acotado por sucursal, excepto donde se indique lo contrario.</p>
 
-      <h3>Roles del sistema</h3>
+      <h3>Principio de alcance acumulativo</h3>
+      <p>Los roles siguen una jerarquía lineal: <strong>Cajero → Supervisor → Admin Central</strong>. Cada rol incluye todos los permisos del rol anterior más los suyos propios. Esto simplifica la administración: no es necesario gestionar roles compuestos ni permisos individuales.</p>
+
+      <h3>Roles del MVP</h3>
       <table>
-        <tr><th>Rol</th><th>Permisos clave</th><th>Ámbito</th></tr>
-        <tr><td>Administrador</td><td>CRUD productos, sucursales, usuarios; ver reportes; configurar sistema; gestionar licencias</td><td>Global (todas las sucursales)</td></tr>
-        <tr><td>Supervisor</td><td>Ver reportes de sucursal asignada; anular ventas; gestionar transferencias; asignar pedidos web</td><td>Por sucursal</td></tr>
-        <tr><td>Vendedor</td><td>Realizar ventas POS; ver stock de sucursal; registrar clientes; imprimir tickets</td><td>Por sucursal</td></tr>
-        <tr><td>Bodeguero</td><td>Recibir transferencias; realizar ajustes de inventario; preparar pedidos web</td><td>Por sucursal</td></tr>
+        <tr><th>Rol</th><th>Ámbito</th><th>Permisos incluidos (acumulativos)</th></tr>
+        <tr><td style="background:#e0f7fa"><strong>Cajero</strong></td><td>Su sucursal asignada</td>
+          <td>
+            • Realizar ventas POS (abrir/cerrar caja, cobrar, emitir ticket)<br>
+            • Ver stock de su sucursal (solo lectura)<br>
+            • Registrar clientes nuevos (datos básicos)<br>
+            • Consultar historial de ventas propias
+          </td>
+        </tr>
+        <tr><td style="background:#fff3e0"><strong>Supervisor</strong></td><td>Su sucursal asignada</td>
+          <td>
+            • Todo lo de Cajero<br>
+            • Anular ventas (con razón obligatoria)<br>
+            • Gestionar transferencias de stock entre sucursales<br>
+            • Asignar pedidos web a ruta de despacho (Modo B)<br>
+            • Realizar ajustes de inventario<br>
+            • Ver reportes de ventas y stock de su sucursal
+          </td>
+        </tr>
+        <tr><td style="background:#f3e5f5"><strong>Admin Central</strong></td><td>Global (todas las sucursales)</td>
+          <td>
+            • Todo lo de Supervisor (en cualquier sucursal)<br>
+            • CRUD de productos, sucursales, usuarios y canales Woo<br>
+            • Configurar canales WooCommerce (credenciales API, webhooks)<br>
+            • Ver reportes consolidados (cruzados por sucursal)<br>
+            • Gestionar licencias y configuración del sistema<br>
+            • Acceso al log de auditoría y reconciliación
+          </td>
+        </tr>
       </table>
 
       <h3>Implementación técnica</h3>
       <p>Usamos <code>spatie/laravel-permission</code> con una adaptación multi-sucursal:</p>
       <ul>
-        <li>Los roles se asignan a un usuario <strong>en relación con una sucursal</strong> (pivot table <code>model_branch_roles</code>).</li>
-        <li>El middleware <code>CheckBranchAccess</code> verifica que el usuario autenticado tenga el rol requerido en la sucursal actual de la sesión.</li>
-        <li>Los permisos globales (administración del sistema) se asignan sin sucursal.</li>
+        <li>Los roles se asignan a un usuario <strong>en relación con una sucursal</strong> mediante la tabla pivot <code>model_branch_roles</code> (user_id, role_id, branch_id).</li>
+        <li>El middleware <code>CheckBranchAccess</code> verifica que el usuario tenga el rol requerido en la sucursal activa de la sesión.</li>
+        <li>Los permisos globales (Admin Central) se asignan sin sucursal (branch_id = null).</li>
+        <li>Para la jerarquía acumulativa, se usa un <code>RoleHierarchyService</code> que permite a un rol ejecutar Gates definidos para roles inferiores.</li>
       </ul>
 
-      <h3>Matriz de autorización</h3>
-      <pre>// Gates de ejemplo
-Gate::define('manage-stock', fn(User \$user, Branch \$branch) =&gt;
-    \$user->hasRole(['administrador', 'supervisor', 'bodeguero'], \$branch->id)
+      <pre>// Gates del sistema
+Gate::define('pos-operate', fn(User \$user, Branch \$branch) =&gt;
+    \$user->hasRoleInBranch(['cajero', 'supervisor', 'admin-central'], \$branch)
 );
 
 Gate::define('void-sale', fn(User \$user, Branch \$branch) =&gt;
-    \$user->hasRole(['administrador', 'supervisor'], \$branch->id)
+    \$user->hasRoleInBranch(['supervisor', 'admin-central'], \$branch)
 );
 
-Gate::define('configure-system', fn(User \$user) =&gt;
-    \$user->hasRole('administrador') // Global, sin sucursal
+Gate::define('manage-woo-channels', fn(User \$user) =&gt;
+    \$user->hasRole('admin-central') // Global
+);
+
+Gate::define('view-cross-reports', fn(User \$user) =&gt;
+    \$user->hasRole('admin-central')
 );</pre>
+
+      <h3>Matrix visual de acceso por módulo</h3>
+      <table>
+        <tr><th>Módulo / Acción</th><th>Cajero</th><th>Supervisor</th><th>Admin Central</th></tr>
+        <tr><td>POS — Vender</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+        <tr><td>POS — Anular venta</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+        <tr><td>Stock — Ver stock sucursal</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+        <tr><td>Stock — Ajustar inventario</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+        <tr><td>Stock — Transferencias</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+        <tr><td>Pedidos — Asignar ruta despacho</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+        <tr><td>Productos — CRUD</td><td>No</td><td>No</td><td>Sí</td></tr>
+        <tr><td>Sucursales — CRUD</td><td>No</td><td>No</td><td>Sí</td></tr>
+        <tr><td>Canales Woo — Configurar</td><td>No</td><td>No</td><td>Sí</td></tr>
+        <tr><td>Usuarios — Gestionar</td><td>No</td><td>No</td><td>Sí</td></tr>
+        <tr><td>Reportes — Por sucursal</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+        <tr><td>Reportes — Consolidado global</td><td>No</td><td>No</td><td>Sí</td></tr>
+        <tr><td>Auditoría — Log del sistema</td><td>No</td><td>No</td><td>Sí</td></tr>
+      </table>
     </article>
 
     <!-- ================================================================ -->

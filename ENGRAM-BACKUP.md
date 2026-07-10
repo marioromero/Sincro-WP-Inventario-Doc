@@ -134,112 +134,147 @@ $this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
 
 ## 3. MOTOR DE SINCRONIZACIÓN WOOCOMMERCE
 
-### 3.1 Fuentes de Verdad por Dominio
+### 3.1 Reglas de Verdad
+- **Stock:** Bidireccional con jerarquía POS. El POS siempre impone su valor sobre WooCommerce. WooCommerce descuenta para pedidos web, el POS descuenta para ventas presenciales. Ajustes solo desde POS.
+- **Catálogo (productos):** Bidireccional con resolución de conflictos. Dos estrategias documentadas:
+  - *Estrategia A — "Gana el timestamp más reciente":* Simple, compara updated_at. Vulnerable a skew de reloj (>5s).
+  - *Estrategia B — "Bloqueo de campos según origen":* Cada campo tiene dueño definido (sku, price → POS; description, images → WooCommerce). Más robusta pero requiere configuración explícita.
+- **Pedidos web:** WooCommerce → POS (unidireccional). Una vez importados no se modifican retroactivamente.
+- **Clientes:** Bidireccional con última escritura gana.
+- **Imágenes:** WooCommerce → POS (referencia por URL).
+
+### 3.2 Fuentes de Verdad
 
 | Dato | Fuente | Dirección |
 |------|--------|-----------|
-| Stock | POS (Stock Ledger) | POS → WooCommerce |
-| Catálogo (SKU, nombre, precio) | POS | POS → WooCommerce |
-| Pedidos web | WooCommerce | WooCommerce → POS |
+| Stock disponible | POS (Stock Ledger) | POS → WooCommerce (jerarquía POS) |
+| Catálogo — SKU, nombre, precio | POS | POS → WooCommerce (según estrategia) |
+| Catálogo — descripción, imágenes, categorías | WooCommerce | WooCommerce → POS (según estrategia) |
+| Pedidos web | WooCommerce | WooCommerce → POS (unidireccional) |
 | Clientes | POS | Bidireccional |
 | Precios por sucursal | POS | POS → WooCommerce |
-| Imágenes | WooCommerce | WC → POS (URL) |
-
-### 3.2 Reglas de Resolución de Conflictos
-- **Stock:** WooCommerce nunca sobreescribe POS
-- **Productos:** POS empuja a WC; productos solo-WC se importan como "no vinculados"
-- **Pedidos web:** Una vez importados, no se modifican retroactivamente desde WC
-- **Clientes:** Última escritura gana; POS prioridad para datos locales
 
 ### 3.3 Webhooks Entrantes
 | Evento WC | Endpoint POS | Acción |
 |-----------|-------------|--------|
-| order.created | POST /api/webhooks/order-created | Importar pedido |
-| order.updated | POST /api/webhooks/order-updated | Actualizar estado |
-| product.updated | POST /api/webhooks/product-updated | Re-sincronizar |
-| stock.updated | POST /api/webhooks/stock-updated | Log (no sobreescribe) |
+| order.created | POST /api/webhooks/order-created | Importar pedido como venta en estado `en_transito` |
+| order.updated | POST /api/webhooks/order-updated | Actualizar estado y notas internas |
+| product.updated | POST /api/webhooks/product-updated | Re-sincronizar campos propiedad de WC |
+| product.created | POST /api/webhooks/product-created | Importar como "no vinculado" |
+| stock.updated | POST /api/webhooks/stock-updated | Log de auditoría (no sobreescribe POS) |
 
-Validación: HMAC-SHA256 con secret compartido.
+Validación: HMAC-SHA256 con secret compartido. Los webhooks se procesan dentro de un Job para no bloquear la respuesta HTTP.
 
-### 3.4 Jobs Salientes
-| Acción POS | Job | Endpoint WC |
-|-----------|-----|-------------|
-| Crear producto | SyncProductToWooCommerce | POST /wp-json/wc/v3/products |
-| Actualizar stock | SyncStockToWooCommerce | PUT /wp-json/wc/v3/products/{id} |
-| Transferencia | SyncTransferToWooCommerce | PUT /wp-json/wc/v3/products/{id} |
-| Crear cliente | SyncCustomerToWooCommerce | POST /wp-json/wc/v3/customers |
+### 3.4 Jobs Salientes (REST API asíncrona)
+| Evento POS | Job | Endpoint WC | Prioridad |
+|-----------|-----|-------------|-----------|
+| Crear producto | SyncProductToWooCommerce | POST /wp-json/wc/v3/products | Normal |
+| Actualizar stock | SyncStockToWooCommerce | PUT /wp-json/wc/v3/products/{id} | Alta |
+| Transferencia | SyncTransferToWooCommerce | PUT /wp-json/wc/v3/products/{id} | Normal |
+| Crear/actualizar cliente | SyncCustomerToWooCommerce | POST /wp-json/wc/v3/customers | Baja |
+| Actualizar precio | SyncPriceToWooCommerce | PUT /wp-json/wc/v3/products/{id} | Normal |
 
-### 3.5 Resiliencia
+### 3.5 Reconciliación de Stock
+Job programado (`php artisan sync:reconcile-stock`) que cruza el stock total del POS contra WooCommerce. Se ejecuta en ventanas de bajo tráfico (ej. 3:00 AM vía cron). Detecta discrepancias y fuerza la sincronización. Para catálogos >10k productos, usar paginación en la consulta a WooCommerce.
+
+### 3.6 Resiliencia
 - Reintentos: 5 con backoff (30s, 2min, 5min, 15min, 30min)
-- Dead Letter Queue: failed_jobs con comando para re-encolar
-- Idempotencia: UUID en X-Idempotency-Key
-- Throttling: middleware throttle de Laravel HTTP Client
+- Dead Letter Queue: failed_jobs con `php artisan sync:retry-all`
+- Idempotencia: UUID en X-Idempotency-Key (WooCommerce lo almacena 24h)
+- Throttling: middleware throttle de Laravel HTTP Client + semáforo por CanalWoo
+- Colas por prioridad: high (stock), normal (productos), low (clientes)
 
 ---
 
 ## 4. DOMINIO INVENTARIO Y CATÁLOGO
 
 ### 4.1 Stock Ledger
-Principios: inmutabilidad, auditabilidad, trazabilidad.
+Principios: inmutabilidad, auditabilidad, trazabilidad. Prohibido usar campo de texto plano para stock actual.
+
+**Tipos de movimiento (enum):**
+| Tipo | Signo | Descripción | Documento origen |
+|------|-------|-------------|-----------------|
+| entrada | + | Ingreso por compra/reposición | PurchaseOrder |
+| salida | − | Egreso por devolución/merma | WastageNote |
+| venta_pos | − | Descuento por venta presencial | Sale (origen pos) |
+| venta_web | − | Descuento por pedido web | Sale (origen web) |
+| ajuste | ± | Corrección manual (razón obligatoria) | StockAdjustment |
+| inicial | + | Saldo inicial de carga | InitialStock |
+| transfer_out | − | Salida por transferencia a otra sucursal | Transfer (origen) |
+| transfer_in | + | Entrada por recepción de transferencia | Transfer (destino) |
+| reserva_en_transito | − | Reserva temporal para pedido web no confirmado | Sale (estado reservado) |
+| reversion | ± | Contrapartida de movimiento anterior | Documento original |
 
 **Estructura:**
-- product_id, branch_id, type (enum)
-- quantity (positivo=entrada, negativo=salida)
-- balance_after (saldo posterior)
-- user_id, reference_type, reference_id
-- reason, timestamps
+- product_id, branch_id, type (string), quantity (int, ±)
+- balance_after (saldo posterior calculado al insertar)
+- user_id, reference (nullableMorphs), reason
+- Index: (product_id, branch_id, created_at)
 
-**Cálculo:** Stock disponible = SUM(quantity) sobre ledger filtrado por product_id + branch_id. No hay campo calculado. Para alto volumen: tabla denormalizada actualizada por eventos.
+**Cálculo:** Stock disponible = SUM(quantity). Stock real = exclude `reserva_en_transito`. Para >100k movimientos: tabla denormalizada `branch_product_stock` actualizada por eventos.
 
-### 4.2 Modelo Sucursales
-Entidad branches con: datos contacto, horario (JSON), config POS, usuarios asignados (many-to-many con roles por sucursal), precios propios.
+### 4.2 Sucursales y Canales Web
 
-**Transferencias entre sucursales:**
-1. Salida (origen): transfer_out, reduce stock, producto "en tránsito"
-2. Entrada (destino): transfer_in, incrementa stock
+**Sucursal (branches):** Entidad con datos de contacto, horario (JSON), config POS, usuarios (N:M con roles por sucursal), precios propios (vía pivot branch_product), stock segregado, cobertura de despacho.
+
+**CanalWoo:** Representa una tienda WooCommerce conectada. Cada canal tiene sus propias credenciales API y webhook secret. Un cliente puede tener múltiples canales (retail, B2B, etc.).
+
+- `canal_woos`: id, branch_id (FK), nombre, url, api_key (encrypted), api_secret (encrypted), webhook_secret (encrypted), activo, config (JSON)
+- `product_woo_mappings`: (product_id, canal_woo_id) → woo_id, woo_sku. Unique por par. Cada producto tiene un ID remoto distinto por canal.
+
+**Transferencias:** proceso de 2 pasos: transfer_out (origen, -stock), transfer_in (destino, +stock).
 
 **Reglas:**
-- Producto puede existir sin stock en sucursal
+- Producto sin stock aparece en catálogo como no disponible
 - Precios por sucursal opcionales (fallback a precio base)
-- Usuario puede tener roles diferentes en distintas sucursales
+- Usuario con roles diferentes por sucursal
+- Stock global solo para reportes
+
+### 4.3 Diagrama Entidad-Relación
+Diagrama SVG embebido en `index.html` (sección 4.3). Entidades: User, Role, Sucursal, CanalWoo, Product, Customer, Sale, StockMovement. Pivots: branch_product, product_woo_mappings. Relaciones N:M entre User-Role y User-Sucursal. 1:N: Sucursal→CanalWoo, Sucursal→Sale, Product→StockMovement, Customer→Sale.
 
 ---
 
 ## 5. DOMINIO VENTAS Y PEDIDOS WEB
 
 ### 5.1 Rutas de Despacho
-Pedidos web importados requieren asignación a sucursal para preparación/despacho.
+Tres modos de asignación de pedidos web a sucursal:
 
-**Asignación automática:**
-1. Obtener comuna de envío del pedido
-2. Buscar sucursal con cobertura en esa comuna
-3. Fallback: sucursal preferida del cliente
-4. Último recurso: sucursal principal
+- **Modo A — Sucursal fija/Bodega central:** Todos los pedidos se asignan a la sucursal default del CanalWoo. Sin intervención manual. Ideal para un solo punto de despacho.
+- **Modo B — Selección manual por supervisor:** Pedidos llegan a buzón de asignación (estado `pending_assignment`). Supervisor elige sucursal. Soporte MVP para multi-sucursal.
+- **Modo C — Enrutamiento geográfico (backlog Fase 2):** Asignación automática por comuna de envío. Requiere tabla de cobertura, validación de stock, reglas de costo/tiempo. Usa Modo B como fallback.
 
-**Estados:** pending_assignment → assigned → preparing → ready_for_pickup → in_delivery → delivered | cancelled
+**Estados:** pending_assignment → assigned → preparing → ready_for_pickup → in_delivery → delivered | cancelled. Cada cambio actualiza el estado en WooCommerce vía API REST.
 
 ---
 
 ## 6. CUMPLIMIENTO Y SEGURIDAD
 
-### 6.1 Ley 21.719 (Protección de Datos)
-- Consentimiento explícito (checkbox no pre-seleccionado)
-- Derechos ARCO: API exportación, eliminación lógica con anonimización
-- Portabilidad: exportación JSON descargable
-- Encriptación: AES-256 en reposo, TLS 1.3 en tránsito, bcrypt para passwords
-- Notificación de brechas: log de accesos + alertas automáticas
-- Retención: configurable, purga automática tras 5 años
+### 6.1 Privacidad por Diseño (Ley 21.719)
 
-### 6.2 Roles y Permisos
+**Minimización de datos:** Solo recolectar RUT, nombre, email y teléfono como obligatorios. Datos demográficos opcionales con consentimiento adicional.
 
-| Rol | Permisos Clave | Ámbito |
-|-----|---------------|--------|
-| Administrador | CRUD todo, reportes, configurar, licencias | Global |
-| Supervisor | Reportes sucursal, anular ventas, transferencias, asignar pedidos | Por sucursal |
-| Vendedor | Ventas POS, ver stock, registrar clientes | Por sucursal |
-| Bodeguero | Recibir transferencias, ajustes, preparar pedidos | Por sucursal |
+**Cifrado en reposo:** RUT, email y teléfono se almacenan con AES-256 (librería `lakm/laravel-encrypted-trait`). Se indexa hash SHA-256 del RUT para búsquedas. Email almacena hash auxiliar para login.
 
-Implementación: spatie/laravel-permission con pivot table model_branch_roles + middleware CheckBranchAccess.
+**Consentimiento explícito:** Tabla `customer_consents` con customer_id, purpose (marketing|data_processing|sharing_third_party), granted, ip_address, policy_version. Checkbox no pre-seleccionado. Revocable desde el perfil del cliente.
+
+**Derecho al olvido:** Endpoint que verifica obligaciones legales (facturas con DTE → retención 5 años). Si hay obligaciones: anonimización (reemplazar datos por valores irreversibles). Si no: eliminación completa + anonimización de referencias en ventas históricas. Todo auditado.
+
+**Rectificación:** Cliente actualiza datos desde su perfil. Cada cambio se registra en `customer_data_changes` (valor anterior, nuevo, fecha, IP) para reconstrucción de historial.
+
+**Retención:** Configurable. Purga automática tras 5 años sin actividad.
+
+### 6.2 Matriz de Roles MVP
+
+Roles acumulativos (cada uno hereda del anterior):
+
+| Rol | Ámbito | Permisos clave |
+|-----|--------|---------------|
+| **Cajero** | Su sucursal | POS (vender, abrir/cerrar caja, ticket), ver stock (lectura), registrar clientes, historial propio |
+| **Supervisor** | Su sucursal | Todo Cajero + anular ventas, transferencias stock, asignar pedidos web (Modo B), ajustes inventario, reportes sucursal |
+| **Admin Central** | Global | Todo Supervisor (cualquier sucursal) + CRUD productos/sucursales/usuarios/canales Woo, configurar WooCommerce, reportes consolidados, licencias, auditoría |
+
+**Implementación:** spatie/laravel-permission con pivot table `model_branch_roles` (user_id, role_id, branch_id). Middleware `CheckBranchAccess`. Roles globales con branch_id=null. RoleHierarchyService para jerarquía acumulativa.
 
 ---
 
@@ -294,6 +329,7 @@ El diagrama de topología está embebido en `index.html` (sección 2.3) y muestr
 |---------|-----------|
 | Stock Ledger | Registro inmutable de movimientos de inventario |
 | Sucursal | Entidad con inventario, precios y usuarios propios |
+| CanalWoo | Representación de una tienda WooCommerce conectada (credenciales API, webhook secret) |
 | Local-First | El sistema opera principalmente con datos locales; la sincronización es secundaria |
 | Consistencia eventual | El estado externo (WooCommerce) converge al real con rezago controlado |
 | Inertia.js | Biblioteca que conecta Laravel con Vue 3 sin API REST |
@@ -302,6 +338,9 @@ El diagrama de topología está embebido en `index.html` (sección 2.3) y muestr
 | DTE | Documento Tributario Electrónico (facturación chilena) |
 | Webpay | Pasarela de pagos de Transbank (Chile) |
 | cPanel | Panel de control de hosting compartido (limitaciones: sin demonios, sin Redis) |
+| En_tránsito | Estado inicial de un pedido web importado, previo a asignación de sucursal |
+| Reconciliación | Job programado que cruza stock POS vs WooCommerce para detectar discrepancias |
+| Bloqueo de campos | Estrategia de resolución de conflictos donde cada campo tiene un sistema propietario |
 
 ---
 

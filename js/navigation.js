@@ -25,14 +25,16 @@
       id: 'sincronizacion', number: '03', title: 'Motor de Sincronización con WooCommerce',
       subs: [
         { id: 'reglas-verdad', title: 'Reglas de Verdad' },
-        { id: 'webhooks', title: 'Webhooks y Sincronización' }
+        { id: 'webhooks', title: 'Webhooks y Sincronización' },
+        { id: 'reconciliacion', title: 'Reconciliación de Stock' }
       ]
     },
     {
       id: 'inventario', number: '04', title: 'Dominio: Inventario y Catálogo',
       subs: [
         { id: 'stock-ledger', title: 'Stock Ledger' },
-        { id: 'sucursales', title: 'Sucursales' }
+        { id: 'sucursales', title: 'Sucursales y Canales' },
+        { id: 'erd', title: 'Diagrama Entidad-Relación' }
       ]
     },
     {
