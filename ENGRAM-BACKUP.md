@@ -390,6 +390,47 @@ El diagrama de topología está embebido en `index.html` (sección 2.3) y muestr
 | En_tránsito | Estado inicial de un pedido web importado, previo a asignación de sucursal |
 | Reconciliación | Job programado que cruza stock POS vs WooCommerce para detectar discrepancias |
 | Bloqueo de campos | Estrategia de resolución de conflictos donde cada campo tiene un sistema propietario |
+| Pinia | Librería de state management para Vue 3, usada exclusivamente para el carrito del POS |
+| useBarcodeScanner | Composable Vue que captura input de pistolas de código de barras vía listener global keydown |
+| Pre-agregación | Jobs programados que consolidan datos transaccionales en tablas de resumen para reportes |
+| Snapshot | Foto del stock por producto × sucursal en un instante, almacenada para consultas históricas |
+
+---
+
+## 10. GUÍA DE DESARROLLO
+
+### 10.1 Frontend: Vue 3 + Inertia
+
+**Manejo de Estado (regla de dos vías):**
+- CRUDs administrativos → solo props de Inertia.js (sin estado global en el cliente)
+- Carrito del POS → Pinia store con persistencia en localStorage (`pinia-plugin-persistedstate` o `@vueuse/core`)
+
+**Lectura de código de barras:** Listener global `keydown` con buffer de caracteres y umbral de 100ms entre teclas para distinguir escáner (sin pausas) de humano tipeando (con pausas). Si el buffer acumula ≥4 caracteres seguidos de Enter, se dispara la búsqueda del producto. Implementado como composable `useBarcodeScanner.js`.
+
+**Arquitectura de componentes por dominio:**
+```
+Pages/POS/{Index,Cart,Checkout}.vue
+Pages/Inventory/{ProductList,ProductForm,StockAdjustment,Transfers}.vue
+Pages/Admin/{Branches,CanalWoo,Users}/...
+Pages/Reports/{SalesSummary,StockHistory}.vue
+Components/Ui/{BaseButton,BaseInput,BaseModal,BaseTable}.vue (reutilizables, sin lógica de negocio)
+Composables/useBarcodeScanner.js, usePosCart.js, useBranchSession.js
+stores/usePosCartStore.js (único store Pinia permitido)
+Layouts/{AppLayout,PosLayout}.vue
+```
+
+### 10.2 Hoja de Ruta de Desarrollo
+
+Secuencia lógica de 6 pasos. No hay fechas ni estimaciones. Cada paso tiene un hito verificable.
+
+| Paso | Nombre | Depende de | Hito |
+|------|--------|-----------|------|
+| 1 | Fundaciones (Laravel+Vue+Inertia, DB, Auth, Roles) | — | Login con 3 roles funcionales |
+| 2 | Core Admin (CRUD Sucursales, CanalWoo, Usuarios, Licencia) | Paso 1 | Admin crea sucursal, canal y usuario |
+| 3 | Motor Inventario (Catálogo, Stock Ledger, 10 tipos movimiento) | Paso 2 | Ledger con trazabilidad correcta |
+| 4 | Frontend POS (Carrito Pinia, Barcode, Cobrar, Comprobante) | Paso 3 | Venta completa descuenta stock |
+| 5 | Integración WooCommerce (REST, Webhooks, Despachos) | Paso 4 | Sync bidireccional funcional |
+| 6 | Reportería + Reconciliación + Deploy cPanel | Pasos 1-5 | Sistema operando en hosting real |
 
 ---
 

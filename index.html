@@ -1516,6 +1516,287 @@ public function handle(): void
       </table>
     </article>
 
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 10: GUÍA DE DESARROLLO                                  -->
+    <!-- ================================================================ -->
+
+    <!-- 10.1 Especificaciones de Frontend (Vue 3 + Inertia) -->
+    <article class="page" id="guia-frontend">
+      <div class="section-id">10 · Guía de Desarrollo</div>
+      <h2>Frontend: Vue 3 + Inertia</h2>
+      <p class="lead">Directrices para construir la interfaz del sistema, con énfasis en el módulo de Caja (POS), que es la pantalla más crítica en términos de reactividad y experiencia de usuario.</p>
+
+      <h3>Manejo de Estado: regla de dos vías</h3>
+      <p>El sistema usa dos estrategias de estado mutuamente excluyentes según el contexto. Mezclarlas en el mismo componente es una mala práctica que debe evitarse:</p>
+
+      <table>
+        <tr><th>Contexto</th><th>Estrategia</th><th>Razón</th></tr>
+        <tr><td>CRUDs administrativos (sucursales, usuarios, productos)</td><td><strong>Props de Inertia.js</strong> — sin estado global en el cliente</td>
+          <td>Son operaciones que cargan datos, los muestran en tabla/formulario y los guardan en servidor. No requieren reactividad entre páginas ni persistencia local. Usar Pinia aquí es sobreingeniería.</td>
+        </tr>
+        <tr><td>Carrito del POS (cart)</td><td><strong>Pinia store</strong> — con persistencia opcional vía <code>pinia-plugin-persistedstate</code></td>
+          <td>El carrito necesita: (a) reactividad fina para sumar totales al vuelo, (b) persistir si el usuario recarga la pestaña por error, y (c) no depender de viajes constantes al servidor hasta que se cierre la venta. Pinia resuelve todo esto de forma nativa.</td>
+        </tr>
+      </table>
+
+      <h4>Implementación del store del carrito</h4>
+      <pre>// stores/usePosCartStore.js
+import { defineStore } from 'pinia'
+import { useStorage } from '@vueuse/core'
+
+export const usePosCartStore = defineStore('pos-cart', {
+  state: () => ({
+    items: useStorage('pos-cart-items', []),    // persistido en localStorage
+    currentSale: null,                           // datos de la venta en curso
+    coupon: null,                                // descuento global si existe
+  }),
+
+  getters: {
+    totalItems: (state) => state.items.reduce((sum, i) => sum + i.quantity, 0),
+    subtotal:   (state) => state.items.reduce((sum, i) => sum + i.quantity * i.price, 0),
+    total:      (state) => {
+      const subtotal = state.items.reduce((s, i) => s + i.quantity * i.price, 0)
+      return state.coupon ? subtotal * (1 - state.coupon.discount) : subtotal
+    },
+  },
+
+  actions: {
+    addProduct(product) { /* agregar o incrementar cantidad */ },
+    removeItem(index)   { /* eliminar línea */ },
+    updateQuantity(index, qty) { /* cambiar cantidad */ },
+    clearCart()         { /* resetear carrito y limpiar storage */ },
+    async checkout()    { /* llamar a Inertia.post(route('pos.store'), ...) */ },
+  },
+})</pre>
+
+      <div class="warn-box">
+        <strong>Regla estricta:</strong> El store de Pinia <strong>solo</strong> se usa para el carrito del POS. Cualquier otro estado global (usuario logueado, sucursal activa, preferencias) se obtiene de las props de Inertia o de la sesión de Laravel a través de <code>usePage()</code>. Si un desarrollador nuevo crea un store de Pinia para productos o sucursales, la PR debe rechazarse.
+      </div>
+
+      <h3>Lectura de Código de Barras</h3>
+      <p>Las pistolas de código de barras USB se comportan como un teclado HID: emiten la secuencia de dígitos del código de barras seguida de un <kbd>Enter</kbd>. El POS debe capturar este input desde cualquier lugar de la pantalla, sin requerir que el cajero haga clic en un campo de búsqueda.</p>
+
+      <h4>Implementación del listener global</h4>
+      <pre>// composables/useBarcodeScanner.js
+import { onMounted, onUnmounted } from 'vue'
+import { usePosCartStore } from '@/stores/usePosCartStore'
+
+export function useBarcodeScanner() {
+  const store = usePosCartStore()
+  let buffer = ''
+  let lastKeyTime = 0
+
+  function onKeyDown(e) {
+    const now = Date.now()
+
+    // Si pasó más de 100ms desde la última tecla, reiniciar buffer
+    // (un escáner tipea sin pausas entre caracteres)
+    if (now - lastKeyTime > 100 &amp;&amp; e.key !== 'Enter') {
+      buffer = ''
+    }
+    lastKeyTime = now
+
+    if (e.key === 'Enter') {
+      if (buffer.length >= 4) {  // mínimo razonable para un código de barras
+        e.preventDefault()
+        store.addProductByBarcode(buffer)
+      }
+      buffer = ''
+      return
+    }
+
+    // Solo capturar dígitos y caracteres comunes en códigos de barras
+    if (/^[A-Z0-9\-]$/i.test(e.key)) {
+      buffer += e.key
+    }
+  }
+
+  onMounted(()    => window.addEventListener('keydown', onKeyDown))
+  onUnmounted(()  => window.removeEventListener('keydown', onKeyDown))
+}</pre>
+
+      <p><strong>Criterios de diseño del listener:</strong></p>
+      <ul>
+        <li>El umbral de 100ms entre teclas distingue un escáner (sin pausas) de un humano tipeando (con pausas). Si se detectan pausas mayores, el buffer se reinicia.</li>
+        <li>No se necesita un input de búsqueda con foco permanente. El cajero puede estar seleccionando métodos de pago mientras escanea productos para la siguiente venta.</li>
+        <li>Para escáneres que emiten un sufijo distinto a Enter (ej. Tab), se parametriza el <code>SUFFIX_KEY</code> en una variable de entorno del frontend.</li>
+      </ul>
+
+      <h3>Arquitectura de componentes por dominio</h3>
+      <p>Los componentes se organizan por dominio funcional, no por tipo técnico. Esto evita que la carpeta <code>components/</code> se convierta en un cajón de sastre con cientos de archivos sin relación.</p>
+
+      <pre>resources/js/
+├── Pages/                          # Páginas de Inertia (una por ruta)
+│   ├── POS/
+│   │   ├── Index.vue               # Página principal del POS
+│   │   ├── Cart.vue                # Carrito de compras
+│   │   └── Checkout.vue            # Pantalla de cobro
+│   ├── Inventory/
+│   │   ├── ProductList.vue
+│   │   ├── ProductForm.vue
+│   │   ├── StockAdjustment.vue
+│   │   └── Transfers.vue
+│   ├── Admin/
+│   │   ├── Branches/
+│   │   │   ├── Index.vue
+│   │   │   └── Form.vue
+│   │   ├── CanalWoo/
+│   │   │   ├── Index.vue
+│   │   │   └── Form.vue
+│   │   └── Users/
+│   │       ├── Index.vue
+│   │       └── Form.vue
+│   └── Reports/
+│       ├── SalesSummary.vue
+│       └── StockHistory.vue
+│
+├── Components/                     # Componentes reutilizables (solo si se usan en 2+ dominios)
+│   ├── Ui/
+│   │   ├── BaseButton.vue
+│   │   ├── BaseInput.vue
+│   │   ├── BaseModal.vue
+│   │   └── BaseTable.vue
+│   └── Partials/
+│       ├── SidebarNav.vue
+│       └── TopBar.vue
+│
+├── Composables/                    # Lógica reactiva reutilizable
+│   ├── useBarcodeScanner.js
+│   ├── usePosCart.js
+│   └── useBranchSession.js
+│
+├── stores/                         # Solo Pinia stores (una: pos-cart)
+│   └── usePosCartStore.js
+│
+├── Layouts/
+│   ├── AppLayout.vue               # Layout principal con sidebar y topbar
+│   └── PosLayout.vue               # Layout minimalista para pantalla de caja
+│
+└── app.js                          # Entry point (crea app Vue, registra Pinia)</pre>
+
+      <blockquote>
+        <strong>Nota:</strong> Los componentes en <code>Components/Ui/</code> deben ser puramente visuales y no contener lógica de negocio. La lógica de dominio vive en las <code>Pages/</code> y los <code>Composables/</code>. Esto permite reutilizar botones e inputs sin arrastrar dependencias del dominio.
+      </blockquote>
+    </article>
+
+    <!-- 10.2 Hoja de Ruta de Desarrollo -->
+    <article class="page" id="guia-hoja-ruta">
+      <div class="section-id">10 · Guía de Desarrollo</div>
+      <h2>Hoja de Ruta (Paso a Paso)</h2>
+      <p class="lead">Secuencia lógica de construcción para un desarrollador solitario. Cada paso depende del anterior. No hay fechas ni estimaciones: solo dependencias y criterios de éxito.</p>
+
+      <div class="info-box">
+        <strong>Cómo usar esta guía:</strong> Completá cada paso en orden. El "hito" de cada paso es la condición que debés verificar antes de avanzar al siguiente. Si el hito no se cumple, detenete y corregí antes de seguir.
+      </div>
+
+      <!-- Paso 1 -->
+      <h3>Paso 1: Fundaciones y Andamiaje</h3>
+      <p><strong>Qué construir:</strong> El esqueleto del sistema. No hay lógica de negocio todavía, solo la infraestructura que la va a sostener.</p>
+      <ul>
+        <li>Crear proyecto Laravel 11 + Vue 3 + Inertia.js + Vite. Compilar y verificar que la página de bienvenida carga.</li>
+        <li>Configurar Tailwind CSS y el layout base (<code>AppLayout.vue</code> con sidebar y topbar).</li>
+        <li>Configurar la base de datos MySQL y verificar conexión desde Laravel.</li>
+        <li>Diseñar y ejecutar las migraciones iniciales (ver diagrama ERD en sección 4.3): users, roles, sucursales, canal_woos, products, customers, sales, stock_ledger y tablas pivote.</li>
+        <li>Implementar autenticación con Laravel Breeze + Inertia (Stack Vue).</li>
+        <li>Implementar la matriz de roles con <code>spatie/laravel-permission</code>: seeders para Cajero, Supervisor y Admin Central.</li>
+        <li>Crear el middleware <code>CheckBranchAccess</code> y el <code>RoleHierarchyService</code>.</li>
+      </ul>
+      <p><strong>Hito:</strong> Poder loguearse con tres usuarios distintos (uno por rol) y ver el panel correspondiente con distintas opciones en la barra lateral según los permisos. Sin esto, no se puede avanzar.</p>
+      <div class="warn-box">
+        <strong>Por qué este orden:</strong> Si la autenticación y los roles no funcionan desde el día uno, cada feature nueva requerirá retrabajo para ajustar permisos. Es más barato validar la matriz con usuarios de prueba ahora que corregir 20 controladores después.
+      </div>
+
+      <!-- Paso 2 -->
+      <h3>Paso 2: Core Administrativo</h3>
+      <p><strong>Qué construir:</strong> Los CRUD que gobiernan la configuración del sistema. No hay transacciones todavía, solo administración de entidades.</p>
+      <ul>
+        <li>CRUD de Sucursales: crear, editar, listar, eliminar sucursales. Configurar horarios y cobertura de despacho.</li>
+        <li>CRUD de CanalWoo: crear tiendas WooCommerce conectadas con credenciales API cifradas. Asociar cada canal a una sucursal default.</li>
+        <li>CRUD de Usuarios: crear usuarios y asignarles roles con ámbito de sucursal (un usuario puede ser Cajero en sucursal A y Supervisor en sucursal B).</li>
+        <li>Implementar el stub de licencia (<code>LocalLicenseStub</code>) como se documenta en la sección 2.4. Verificar que el sistema no bloquee si la licencia "caduca" (siempre responde activo en MVP).</li>
+      </ul>
+      <p><strong>Hito:</strong> Un Admin Central puede crear una sucursal, asociarle un CanalWoo, crear un usuario y asignarle un rol en esa sucursal. Todo persiste y se refleja al recargar.</p>
+      <div class="warn-box">
+        <strong>Por qué este orden:</strong> Antes de vender, el sistema necesita saber dónde se vende (sucursales), cómo se conecta con el mundo exterior (canales Woo) y quién opera (usuarios). Sin estas entidades configuradas, el POS no tiene contexto.
+      </div>
+
+      <!-- Paso 3 -->
+      <h3>Paso 3: El Motor de Inventario (Crítico)</h3>
+      <p><strong>Qué construir:</strong> El catálogo de productos y el Stock Ledger. Este es el módulo más delicado del sistema porque de su correctitud depende la integridad del stock.</p>
+      <ul>
+        <li>CRUD de Categorías y Productos con variantes (talla/color) y precios multi-sucursal (tabla pivot <code>branch_product</code>).</li>
+        <li>Importación/exportación CSV de productos para carga masiva inicial.</li>
+        <li>Construir el <strong>Stock Ledger</strong> (tabla <code>stock_ledger</code>) con los 10 tipos de movimiento documentados en la sección 4.1.</li>
+        <li>Implementar <code>AdjustStockAction</code> y <code>TransferStockAction</code> como transacciones de base de datos que escriben en el ledger y actualizan el saldo denormalizado (<code>branch_product_stock</code>) si existe.</li>
+        <li>Escribir tests unitarios para el ledger: verificar que el saldo calculado (SUM) coincida con el saldo esperado después de secuencias de movimientos (entrada, venta, ajuste, transferencia).</li>
+      </ul>
+      <p><strong>Hito:</strong> Poder registrar una entrada de stock manual, ver el saldo calculado correctamente, hacer una venta que descuente stock, y verificar que el ledger tenga trazabilidad completa (quién, qué, cuándo, por qué).</p>
+      <div class="warn-box">
+        <strong>Por qué este orden:</strong> El inventario es la fuente de verdad del negocio. Si el stock es incorrecto, el POS venderá productos sin existencias y la sincronización con WooCommerce propagará datos erróneos. Cada minuto invertido en tests del ledger ahora ahorra horas de soporte por reclamos de stock después.
+      </div>
+
+      <!-- Paso 4 -->
+      <h3>Paso 4: El Frontend del POS</h3>
+      <p><strong>Qué construir:</strong> La interfaz de caja que el operador usará todo el día. Reactividad y velocidad son los requisitos no funcionales principales.</p>
+      <ul>
+        <li>Diseñar la UI de la caja con <code>PosLayout.vue</code> (layout minimalista: sin sidebar, solo una barra superior con datos de la sucursal y cajero).</li>
+        <li>Implementar el carrito con Pinia (<code>usePosCartStore</code>) con las operaciones: agregar producto (por búsqueda o código de barras), cambiar cantidad, eliminar línea, calcular totales.</li>
+        <li>Integrar el composable <code>useBarcodeScanner</code> para captura global de códigos de barras.</li>
+        <li>Implementar el flujo de "Cobrar": seleccionar método de pago (efectivo, débito, crédito), registrar el pago de forma manual/informativa (sin Webpay), y cerrar la venta.</li>
+        <li>Al cerrar la venta: (a) crear registro en <code>sales</code>, (b) descontar del Stock Ledger vía <code>CreateSaleAction</code>, (c) generar comprobante interno (vista HTML imprimible o PDF simple), (d) limpiar el carrito y dejar la caja lista para la siguiente venta.</li>
+      </ul>
+      <p><strong>Hito:</strong> Un cajero puede abrir la caja, escanear/agregar productos, ver el total actualizarse al vuelo, cobrar, y recibir un comprobante. El stock se descuenta correctamente y se refleja en el ledger.</p>
+      <div class="warn-box">
+        <strong>Por qué este orden:</strong> El POS es la funcionalidad que el cliente ve y usa todos los días. Tenerlo funcionando rápido (aunque sea sin sincronización externa) permite hacer pruebas de usabilidad con usuarios reales y ajustar la UI antes de agregar la complejidad de la sincronización.
+      </div>
+
+      <!-- Paso 5 -->
+      <h3>Paso 5: Integración WooCommerce (Sincronización)</h3>
+      <p><strong>Qué construir:</strong> Conectar el sistema con WooCommerce para que el catálogo, el stock y los pedidos web fluyan en ambos sentidos.</p>
+      <ul>
+        <li>Crear el cliente REST <code>WooCommerceApiClient</code> en <code>Domain/Sync/Clients/</code> usando el HTTP Client de Laravel. Configurar autenticación con Consumer Key + Consumer Secret por CanalWoo.</li>
+        <li>Implementar la estrategia de resolución de conflictos elegida (Estrategia A o B de la sección 3.1).</li>
+        <li>Jobs de sincronización saliente: <code>SyncProductToWooCommerce</code>, <code>SyncStockToWooCommerce</code>, <code>SyncCustomerToWooCommerce</code>. Todos encolados con prioridad.</li>
+        <li>Endpoint de webhook entrante: crear <code>WebhookController</code> con middleware <code>VerifyWebhookSignature</code>. Implementar handlers para <code>order.created</code>, <code>order.updated</code>, <code>product.updated</code>, <code>product.created</code>.</li>
+        <li>Al recibir un nuevo pedido web (<code>order.created</code>): importar a la tabla <code>sales</code> con estado <code>en_transito</code>, descontar del Stock Ledger (movimiento <code>venta_web</code>), y dejar el pedido en el buzón de asignación de ruta de despacho.</li>
+        <li>Implementar las Rutas de Despacho (Modo A y B documentados en sección 5.1).</li>
+      </ul>
+      <p><strong>Hito:</strong> Un producto creado en el POS aparece en WooCommerce. Una venta POS descuenta stock en WooCommerce. Un pedido realizado en la tienda web aparece en el POS como venta <code>en_transito</code> y se puede asignar a una sucursal para despacho.</p>
+      <div class="warn-box">
+        <strong>Por qué este orden:</strong> La sincronización es el feature diferenciador del sistema, pero no tiene sentido until el POS funciona (Paso 4) y el inventario es correcto (Paso 3). Integrar WooCommerce antes de tener un POS sólido agregaría complejidad sin un sistema base contra el cual probar.
+      </div>
+
+      <!-- Paso 6 -->
+      <h3>Paso 6: Reportería, Reconciliación y Despliegue</h3>
+      <p><strong>Qué construir:</strong> Los jobs de fondo que mantienen la salud del sistema y los reportes que el administrador usa para tomar decisiones.</p>
+      <ul>
+        <li>Crear los Jobs de pre-agregación: <code>AggregateDailySales</code> (cada 30-60 min) y <code>SnapshotStock</code> (cada 15-30 min). Ver sección 8.2 para la implementación.</li>
+        <li>Crear el Job de reconciliación: <code>SyncReconcileStock</code> programado a las 3:00 AM (ver sección 3.3).</li>
+        <li>Configurar las entradas de cron en cPanel para estos jobs.</li>
+        <li>Construir las vistas de reportes: resumen de ventas del día, histórico de stock, productos con stock crítico.</li>
+        <li>Pruebas de despliegue en entorno cPanel real: verificar que Inertia funciona con HTTPS, que los assets compilados se sirven correctamente, que el cron ejecuta los jobs, que no hay errores de permisos en storage/logs.</li>
+        <li>Simular restricciones de cPanel: probar que la cola <code>database</code> procesa jobs sin Redis, que no hay timeouts de PHP para requests largas, que el .htaccess no bloquea las rutas de Inertia.</li>
+      </ul>
+      <p><strong>Hito:</strong> El administrador puede ver un reporte de ventas del día anterior con latencia de hasta 60 minutos. La reconciliación nocturna no reporta discrepancias falsas. El sistema funciona en un hosting compartido real sin errores.</p>
+      <div class="warn-box">
+        <strong>Por qué este orden:</strong> Los reportes y la reconciliación cierran el círculo: permiten al negocio operar con datos consolidados y al desarrollador dormir tranquilo sabiendo que el stock se corrige automáticamente. Las pruebas en cPanel real son el paso final porque no tiene sentido deployar un sistema incompleto.
+      </div>
+
+      <hr style="margin:2rem 0; border:0; border-top:1px solid #ddd;">
+
+      <h3>Resumen de dependencias</h3>
+      <pre>Paso 1 (Fundaciones)
+  └──› Paso 2 (Admin) — depende de: auth + roles funcionando
+        └──› Paso 3 (Inventario) — depende de: sucursales + usuarios creados
+              └──› Paso 4 (POS) — depende de: catálogo + ledger correctos
+                    └──› Paso 5 (WooCommerce) — depende de: POS + inventario sólidos
+                          └──› Paso 6 (Reportes + Deploy) — depende de: todo lo anterior</pre>
+
+      <blockquote>
+        <strong>Consejo final:</strong> No saltees pasos. Cada paso produce un hito verificable. Si llegás al Paso 5 y encontrás un bug en el ledger del Paso 3, volvé atrás y corregilo antes de seguir. La deuda técnica en el inventario se paga con intereses compuestos.
+      </blockquote>
+    </article>
+
   </main>
 
   <script src="js/navigation.js"></script>

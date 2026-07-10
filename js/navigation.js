@@ -69,6 +69,13 @@
       subs: [
         { id: 'limites', title: 'Límites y Exclusiones del MVP' }
       ]
+    },
+    {
+      id: 'guia', number: '10', title: 'Guía de Desarrollo',
+      subs: [
+        { id: 'frontend', title: 'Frontend: Vue 3 + Inertia' },
+        { id: 'hoja-ruta', title: 'Hoja de Ruta (Paso a Paso)' }
+      ]
     }
   ];
 
