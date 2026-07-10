@@ -56,6 +56,19 @@
         { id: 'webpay-fisico', title: 'Webpay Físico' },
         { id: 'facturacion-dte', title: 'Facturación DTE' }
       ]
+    },
+    {
+      id: 'interna', number: '08', title: 'Estructura y Operación Interna',
+      subs: [
+        { id: 'directorios', title: 'Core Backend: Directorios' },
+        { id: 'reporteria', title: 'Reportería y Rendimiento' }
+      ]
+    },
+    {
+      id: 'frontera', number: '09', title: 'Frontera del MVP y Backlog Fase 2',
+      subs: [
+        { id: 'limites', title: 'Límites y Exclusiones del MVP' }
+      ]
     }
   ];
 

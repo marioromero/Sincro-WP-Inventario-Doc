@@ -1198,6 +1198,324 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
       </div>
     </article>
 
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 8: ESTRUCTURA Y OPERACIÓN INTERNA                       -->
+    <!-- ================================================================ -->
+
+    <!-- 8.1 Core Backend: Estructura de Directorios -->
+    <article class="page" id="interna-directorios">
+      <div class="section-id">08 · Estructura y Operación Interna</div>
+      <h2>Core Backend: Estructura de Directorios</h2>
+      <p class="lead">El proyecto rechaza la estructura MVC plana de Laravel (<code>app/Models</code>, <code>app/Http/Controllers</code>) en favor de una organización por dominios (DDD ligero). Esto aísla la lógica de negocio para un desarrollador que trabaja solo y facilita migraciones futuras.</p>
+
+      <div class="warn-box">
+        <strong>Decisión arquitectónica:</strong> No usar <code>app/Models/</code> como cajón de sastre. Cada módulo vive en <code>app/Domain/&lt;Nombre&gt;/</code> con sus propios modelos, acciones, jobs y reglas de negocio. Esto permite que, en un escenario de crecimiento, un dominio como Sync pueda extraerse a un microservicio independiente con mínimo esfuerzo.
+      </div>
+
+      <h3>Árbol de directorios propuesto</h3>
+      <pre>app/
+├── Domain/
+│   ├── Identity/          # Roles, usuarios, autenticación
+│   │   ├── Models/
+│   │   │   ├── User.php
+│   │   │   └── Role.php
+│   │   ├── Actions/
+│   │   │   ├── RegisterUserAction.php
+│   │   │   ├── AssignRoleToBranchAction.php
+│   │   │   └── RequestDataForgetAction.php   # Derecho al olvido (Ley 21.719)
+│   │   ├── Policies/
+│   │   │   └── UserPrivacyPolicy.php
+│   │   └── Rules/
+│   │       └── UniqueRutPerCustomer.php
+│   │
+│   ├── Inventory/         # Catálogo y stock
+│   │   ├── Models/
+│   │   │   ├── Product.php
+│   │   │   ├── StockMovement.php
+│   │   │   ├── Branch.php
+│   │   │   └── Category.php
+│   │   ├── Actions/
+│   │   │   ├── AdjustStockAction.php
+│   │   │   ├── TransferStockAction.php
+│   │   │   └── CreateProductAction.php
+│   │   ├── Jobs/
+│   │   │   └── RecalculateStockCache.php
+│   │   └── DataTransferObjects/
+│   │       └── StockMovementDTO.php
+│   │
+│   ├── Sales/             # POS y pedidos
+│   │   ├── Models/
+│   │   │   ├── Sale.php
+│   │   │   ├── SaleItem.php
+│   │   │   ├── Customer.php
+│   │   │   └── Payment.php
+│   │   ├── Actions/
+│   │   │   ├── CreateSaleAction.php
+│   │   │   ├── VoidSaleAction.php
+│   │   │   └── AssignDeliveryRouteAction.php
+│   │   └── Enums/
+│   │       ├── SaleStatus.php
+│   │       └── PaymentMethod.php
+│   │
+│   ├── Sync/              # Sincronización WooCommerce
+│   │   ├── Models/
+│   │   │   ├── CanalWoo.php
+│   │   │   └── ProductWooMapping.php
+│   │   ├── Jobs/
+│   │   │   ├── SyncStockToWooCommerce.php
+│   │   │   ├── SyncProductToWooCommerce.php
+│   │   │   ├── SyncCustomerToWooCommerce.php
+│   │   │   ├── ProcessInboundWebhook.php
+│   │   │   └── ReconcileStock.php
+│   │   ├── Webhooks/
+│   │   │   ├── OrderCreatedHandler.php
+│   │   │   ├── OrderUpdatedHandler.php
+│   │   │   └── ProductUpdatedHandler.php
+│   │   ├── Clients/
+│   │   │   └── WooCommerceApiClient.php
+│   │   └── Rules/
+│   │       ├── FieldOwnershipResolver.php   # Estrategia B: bloqueo de campos
+│   │       └── TimestampConflictResolver.php # Estrategia A: timestamp
+│   │
+│   └── Reporting/         # Pre-agregación y reportes
+│       ├── Models/
+│       │   ├── DailySalesSummary.php
+│       │   └── StockSnapshot.php
+│       ├── Jobs/
+│       │   ├── AggregateDailySales.php
+│       │   └── SnapshotStock.php
+│       └── Actions/
+│           └── BuildCrossBranchReportAction.php
+│
+├── Http/
+│   ├── Controllers/       # Solo controllers "delgados": validan request, llaman Actions
+│   │   ├── PosController.php
+│   │   ├── ProductController.php
+│   │   ├── WebhookController.php
+│   │   └── ReportController.php
+│   └── Middleware/
+│       ├── CheckBranchAccess.php
+│       └── VerifyWebhookSignature.php
+│
+├── Services/              # Servicios transversales (no pertenecen a un dominio)
+│   ├── LicenseValidator.php      # Interfaz + stub
+│   └── RoleHierarchyService.php
+│
+└── Console/
+    └── Commands/
+        ├── SyncReconcileStock.php
+        ├── AggregateDailyReports.php
+        └── PurgeExpiredData.php     # Cumplimiento Ley 21.719</pre>
+
+      <h3>Principios de la estructura</h3>
+      <ul>
+        <li><strong>Controllers delgados:</strong> Cada método de controlador valida la request, llama a una <code>Action</code> y retorna una respuesta. No contiene lógica de negocio.</li>
+        <li><strong>Actions con una sola responsabilidad:</strong> Cada <code>Action</code> ejecuta una tarea de dominio específica. Son invocables desde controllers, jobs o comandos.</li>
+        <li><strong>Jobs en el dominio que los origina:</strong> <code>SyncStockToWooCommerce</code> vive en <code>Domain/Sync/Jobs/</code>, no en <code>app/Jobs/</code>.</li>
+        <li><strong>Modelos auto-contenidos:</strong> Cada modelo incluye sus relaciones, scopes y atributos calculados. No hay repositorios externos que filtren consultas.</li>
+        <li><strong>Enums y DTOs tipifican el dominio:</strong> Los enums reemplazan strings mágicos. Los DTOs transportan datos entre capas sin acoplar a Eloquent.</li>
+      </ul>
+
+      <h3>Beneficio para migraciones futuras</h3>
+      <p>Si el negocio crece y se decide extraer la sincronización a un microservicio independiente, el directorio <code>app/Domain/Sync/</code> se copia a un nuevo proyecto Laravel con cambios mínimos. Las <code>Actions</code> y <code>Jobs</code> ya están encapsuladas; solo hay que reemplazar el <code>WooCommerceApiClient</code> por llamadas HTTP al nuevo servicio. El resto del sistema (Inventory, Sales, Identity) ni se entera del cambio.</p>
+
+      <blockquote>
+        <strong>Consejo para el desarrollador:</strong> No te sientas obligado a crear todas las carpetas de una vez. Empieza con <code>Domain/Sales</code> para el POS y <code>Domain/Inventory</code> para el stock. A medida que el código crezca, extraé <code>Domain/Sync</code> y <code>Domain/Reporting</code>. La estructura debe evolucionar con el sistema, no definirse rígidamente el día cero.
+      </blockquote>
+    </article>
+
+    <!-- 8.2 Reportería y Rendimiento -->
+    <article class="page" id="interna-reporteria">
+      <div class="section-id">08 · Estructura y Operación Interna</div>
+      <h2>Reportería y Rendimiento</h2>
+      <p class="lead">Regla de oro: prohibido calcular reportes en tiempo real sobre tablas transaccionales. El rendimiento del POS es la prioridad máxima; la latencia en reportes es una decisión de diseño aceptada.</p>
+
+      <div class="warn-box">
+        <strong>Riesgo crítico:</strong> Una consulta <code>SELECT SUM(quantity) FROM stock_ledger WHERE ...</code> sobre 500k movimientos mientras un cajero intenta cobrar en el POS puede congelar la base de datos compartida de cPanel. La pre-agregación no es optativa: es obligatoria para la viabilidad del sistema en producción.
+      </div>
+
+      <h3>Estrategia de pre-agregación</h3>
+      <p>En lugar de consultar las tablas transaccionales (<code>stock_ledger</code>, <code>sales</code>) para cada reporte, se ejecutan Jobs programados que consolidan los datos en tablas de resumen. Los reportes leen estas tablas pre-agregadas.</p>
+
+      <h4>Job: AggregateDailySales</h4>
+      <p>Se ejecuta cada 30-60 minutos. Agrupa las ventas del día por sucursal, método de pago y categoría de producto, y escribe los totales en <code>daily_sales_summaries</code>.</p>
+
+      <pre>// app/Domain/Reporting/Jobs/AggregateDailySales.php
+public function handle(): void
+{
+    // 1. Obtener ventas del día actual que aún no han sido agregadas
+    \$lastAggregation = DailySalesSummary::max('aggregated_until')
+        ?? now()->subDay();
+
+    \$sales = Sale::where('created_at', '>', \$lastAggregation)
+        ->where('status', '!=', 'cancelled')
+        ->get();
+
+    // 2. Agrupar por sucursal × método de pago × categoría
+    \$groups = \$sales->groupBy(fn(\$s) => [
+        'branch_id'    => \$s->branch_id,
+        'payment_method' => \$s->payment_method,
+        'date'         => \$s->created_at->toDateString(),
+    ]);
+
+    // 3. Upsert masivo en tabla de resumen
+    foreach (\$groups as \$key => \$group) {
+        DailySalesSummary::upsert([
+            'branch_id'      => \$group[0]->branch_id,
+            'payment_method'  => \$group[0]->payment_method,
+            'date'           => \$group[0]->created_at->toDateString(),
+            'total_sales'    => \$group->count(),
+            'total_revenue'  => \$group->sum('total'),
+            'aggregated_until' => now(),
+        ], ['branch_id', 'payment_method', 'date']);
+    }
+}</pre>
+
+      <h4>Job: SnapshotStock</h4>
+      <p>Se ejecuta cada 15-30 minutos. Toma una foto del stock actual de cada producto por sucursal y la almacena en <code>stock_snapshots</code>. Esto permite consultar el stock histórico sin sumar el ledger completo.</p>
+
+      <pre>// app/Domain/Reporting/Jobs/SnapshotStock.php
+public function handle(): void
+{
+    \$products = Product::with('branches')->get();
+
+    \$snapshots = [];
+    foreach (\$products as \$product) {
+        foreach (\$product->branches as \$branch) {
+            \$snapshots[] = [
+                'product_id'     => \$product->id,
+                'branch_id'      => \$branch->id,
+                'stock_quantity' => \$product->stockEnSucursal(\$branch),
+                'snapshot_at'    => now(),
+            ];
+        }
+    }
+
+    StockSnapshot::insert(\$snapshots);  // insert masivo
+}</pre>
+
+      <h4>Tablas de resumen</h4>
+      <table>
+        <tr><th>Tabla</th><th>Propósito</th><th>Frecuencia</th></tr>
+        <tr><td><code>daily_sales_summaries</code></td><td>Ventas agregadas por sucursal, método de pago y fecha</td><td>Cada 30-60 min</td></tr>
+        <tr><td><code>stock_snapshots</code></td><td>Foto del stock por producto × sucursal en un instante</td><td>Cada 15-30 min</td></tr>
+        <tr><td><code>branch_product_stock</code></td><td>Stock actual denormalizado (actualizado por eventos de dominio)</td><td>Tiempo real (eventos)</td></tr>
+        <tr><td><code>monthly_sales_summaries</code></td><td>Agregación mensual para reportes de cierre</td><td>Diario (acumula)</td></tr>
+      </table>
+
+      <h3>Configuración del cron para reportería</h3>
+      <pre># Reportes — ejecutar cada 30 minutos
+*/30 * * * * /usr/local/bin/php /home/user/public_html/artisan reports:aggregate-sales >> /dev/null 2>&amp;1
+
+# Snapshots de stock — ejecutar cada 15 minutos
+*/15 * * * * /usr/local/bin/php /home/user/public_html/artisan stock:snapshot >> /dev/null 2>&amp;1
+
+# Cierre diario (consolidación mensual) — ejecutar a las 23:45
+45 23 * * * /usr/local/bin/php /home/user/public_html/artisan reports:close-day >> /dev/null 2>&amp;1</pre>
+
+      <h3>Latencia como decisión de diseño</h3>
+      <p>El panel de reportes del MVP muestra datos con una latencia de hasta 60 minutos. Esto es intencional. El cajero no puede esperar a que una consulta pesada termine para completar una venta. El administrador que revisa reportes puede tolerar datos de "hace 30 minutos".</p>
+      <p>Si en Fase 2 se requiere reportes en tiempo real, se implementa una capa de caché (Redis si el hosting lo soporta, o tabla denormalizada <code>branch_product_stock</code>) que se actualiza mediante eventos de dominio, no por consultas directas al ledger.</p>
+
+      <blockquote>
+        <strong>Métrica de rendimiento objetivo:</strong> Toda transacción POS debe completarse en &lt;500ms. Las consultas de reportes no deben degradar este tiempo. Si una consulta de reporte tarda 10 segundos pero no afecta al POS, es aceptable. Si una consulta de reporte hace que una transacción POS tarde 2 segundos, hay que corregirla.
+      </blockquote>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 9: FRONTERA DEL MVP Y BACKLOG                           -->
+    <!-- ================================================================ -->
+
+    <article class="page" id="frontera-limites">
+      <div class="section-id">09 · Frontera del MVP y Backlog Fase 2</div>
+      <h2>Límites y Exclusiones del MVP</h2>
+      <p class="lead">Esta página define explícitamente qué funcionalidades están fuera del alcance de la primera versión entregable (MVP) y documenta su alcance conceptual para el desarrollo futuro. Ninguna de estas funcionalidades debe implementarse en la fase MVP.</p>
+
+      <h3>1. Pagos Integrados (Webpay POS / Transbank)</h3>
+      <p><strong>Situación en el MVP:</strong> El POS registra los pagos de forma manual e informativa. El cajero selecciona "Efectivo", "Débito" o "Crédito" como método de pago, pero la integración con el terminal físico de Transbank no existe. El flujo de pago es: el cajero cobra en el POS, el sistema registra el método, y el cajero opera el terminal POS físico de forma independiente.</p>
+      <p><strong>Por qué no está en el MVP:</strong></p>
+      <ul>
+        <li><strong>Trámites comerciales:</strong> La integración con Transbank requiere un contrato comercial, certificación técnica (2-4 semanas) y, en algunos casos, un POS físico proporcionado por el banco. Esto no es un obstáculo técnico sino comercial y de tiempo.</li>
+        <li><strong>Bridge local:</strong> El SDK de Transbank es Java o .NET, no PHP. Se necesita un proceso externo (bridge Node.js o Java) que se comunique con el terminal por puerto serie o Bluetooth. Este bridge debe ejecutarse en la máquina del operador, no en el servidor, y orquestarlo desde Laravel requiere un canal de comunicación (WebSocket local o API HTTP en localhost).</li>
+        <li><strong>Multi-plataforma:</strong> El bridge sería específico del SO del operador (Windows .dll vs Linux .so), duplicando el esfuerzo de desarrollo y testing.</li>
+      </ul>
+      <p><strong>Alcance conceptual para Fase 2:</strong></p>
+      <ul>
+        <li>Evaluar Webpay API 2.0 (QR dinámico) que permite al cliente pagar desde su teléfono sin terminal POS físico, eliminando la necesidad del bridge.</li>
+        <li>Si se requiere terminal físico, implementar un bridge Node.js con comunicación vía WebSocket (localhost) hacia el navegador del POS.</li>
+        <li>La certificación Transbank corre por cuenta del cliente, no del desarrollador.</li>
+      </ul>
+
+      <h3>2. Facturación Electrónica (DTE / SII)</h3>
+      <p><strong>Situación en el MVP:</strong> El sistema emite un comprobante interno (ticket o comprobante no tributario) al finalizar cada venta. Este comprobante cumple como respaldo de la operación pero <strong>no tiene validez fiscal</strong>.</p>
+      <p><strong>Por qué no está en el MVP:</strong></p>
+      <ul>
+        <li><strong>Obligación legal vs complejidad técnica:</strong> Emitir DTE requiere integración con el SII (SOAP XML con firma electrónica) o con un proveedor autorizado (PayMe, LibreDTE, Haulmer). Cada proveedor tiene su propia API, modelo de datos y costos asociados.</li>
+        <li><strong>Decisión de proveedor pendiente:</strong> El cliente debe elegir el proveedor de facturación. No es una decisión técnica sino comercial. El desarrollador no debe forzar una elección en el MVP.</li>
+        <li><strong>Múltiples flujos:</strong> Boleta electrónica (sin RUT) vs factura electrónica (con RUT). Notas de crédito/débito. Cada flujo duplica la lógica de integración.</li>
+      </ul>
+      <p><strong>Alcance conceptual para Fase 2:</strong></p>
+      <ul>
+        <li>Integrar con un proveedor API REST (PayMe recomendado por SDK moderno y soporte local).</li>
+        <li>El POS emite boleta/factura al momento del pago. WooCommerce emite DTE para pedidos web al confirmar despacho.</li>
+        <li>Implementar tabla <code>sales.dte_uuid</code> para trackear el documento fiscal asociado a cada venta.</li>
+        <li>La firma electrónica del cliente se almacena de forma segura en la configuración del sistema.</li>
+      </ul>
+
+      <div class="info-box">
+        <strong>Importante:</strong> La emisión de comprobantes no tributarios en el MVP es legal siempre que el cliente emita los DTE correspondientes por otro medio (ej. WooCommerce con plugin de facturación, o facturación manual). El POS no reemplaza la obligación fiscal del cliente; es responsabilidad de este último asegurar el cumplimiento tributario.
+      </div>
+
+      <h3>3. Modo Offline (PWA / IndexedDB)</h3>
+      <p><strong>Situación en el MVP:</strong> El POS requiere conexión continua al servidor (cPanel). Cada transacción se registra mediante Inertia.js hacia Laravel. Si la conexión se pierde, el POS deja de operar.</p>
+      <p><strong>Por qué no está en el MVP:</strong></p>
+      <ul>
+        <li><strong>Complejidad de sincronización bidireccional:</strong> Implementar un caché local (IndexedDB en el navegador) que almacene transacciones offline y las sincronice al reconectar requiere un motor de conflictos, detección de cambios, y lógica de reconciliación que duplica gran parte del backend en el frontend.</li>
+        <li><strong>Caché de catálogo:</strong> El navegador debe almacenar localmente el catálogo de productos, precios y stock. Para catálogos grandes (&gt;5000 productos), esto implica manejar cuotas de almacenamiento, versionado de datos y actualización diferencial.</li>
+        <li><strong>Colisiones y consistencia:</strong> Dos cajeros offline en la misma sucursal podrían vender el mismo último producto. Resolver esa colisión post-reconexión es un problema de dominio que requiere una estrategia de "último en llegar pierde" o "reserva temporal".</li>
+      </ul>
+      <p><strong>Alcance conceptual para Fase 3:</strong></p>
+      <ul>
+        <li>Implementar Service Worker + IndexedDB como capa de persistencia local.</li>
+        <li>Jobs de sincronización en el frontend que empujen transacciones acumuladas al servidor al recuperar la conexión.</li>
+        <li>Estrategia de resolución: "primero en llegar, primero en servirse" con alerta al administrador sobre colisiones resueltas.</li>
+        <li>El catálogo se cachea con versionado: cada producto tiene un <code>version_id</code> que el frontend compara para saber si necesita actualizar su copia local.</li>
+      </ul>
+
+      <div class="warn-box">
+        <strong>Decisión consciente:</strong> El MVP sacrifica el modo offline para reducir la complejidad y acelerar la entrega. La mayoría de los comercios chilenos tienen conectividad estable en sus sucursales urbanas. El modo offline es una funcionalidad diferencial para clientes con sucursales en zonas rurales o con conectividad intermitente.
+      </div>
+
+      <h3>4. Enrutamiento Geográfico (Modo C — Despacho)</h3>
+      <p><strong>Situación en el MVP:</strong> Los pedidos web se asignan a sucursal mediante Modo A (sucursal fija del CanalWoo) o Modo B (selección manual por supervisor). No hay asignación automática por geolocalización.</p>
+      <p><strong>Por qué no está en el MVP:</strong> Ver sección <a href="#ventas-rutas-despacho" onclick="showPage('ventas-rutas-despacho')">5.1 Rutas de Despacho</a>. Requiere mantener una base de datos de comunas, tabla de cobertura por sucursal, lógica de excepción por falta de stock, y validación de direcciones. Es deseable pero no crítico para la operación inicial.</p>
+      <p><strong>Alcance conceptual para Fase 2:</strong></p>
+      <ul>
+        <li>Tabla <code>branch_coverage</code> con (branch_id, comuna, activo, prioridad).</li>
+        <li>Algoritmo de asignación: cobertura geográfica → disponibilidad de stock → costo de despacho → tiempo estimado.</li>
+        <li>Fallback a Modo B si la asignación automática no encuentra candidata.</li>
+        <li>API externa de geocodificación (Google Maps / OpenStreetMap) para validar direcciones.</li>
+      </ul>
+
+      <h3>5. Integración con servicios de tracking (Chilexpress, Starken, Bluexpress)</h3>
+      <p><strong>Situación en el MVP:</strong> No hay tracking externo. El estado de despacho se actualiza manualmente en el POS y se refleja en WooCommerce.</p>
+      <p><strong>Por qué no está en el MVP:</strong> Cada courier tiene su propia API de tracking con distintos formatos y requerimientos de autenticación. La integración es puramente operativa y no afecta la transaccionalidad del negocio.</p>
+      <p><strong>Alcance conceptual para Fase 2:</strong> Tabla <code>shipping_providers</code> con configuración de API por courier. Webhook receptor para actualizar estado automáticamente cuando el courier escanea el paquete.</p>
+
+      <h3>Resumen visual: MVP vs Fase 2</h3>
+      <table>
+        <tr><th>Funcionalidad</th><th>MVP</th><th>Fase 2</th><th>Fase 3</th></tr>
+        <tr><td>POS con ventas, descuentos, múltiples pagos</td><td>Sí</td><td>—</td><td>—</td></tr>
+        <tr><td>Webpay presencial (terminal Transbank)</td><td>No (manual)</td><td>Bridge Node.js o API 2.0</td><td>—</td></tr>
+        <tr><td>Facturación DTE (SII/proveedor)</td><td>No (comprobante interno)</td><td>Integración PayMe</td><td>—</td></tr>
+        <tr><td>Modo Offline (PWA / IndexedDB)</td><td>No (requiere conexión)</td><td>—</td><td>Arquitectura offline-first</td></tr>
+        <tr><td>Enrutamiento geográfico de despachos</td><td>No (Modo A o B)</td><td>Algoritmo + cobertura</td><td>—</td></tr>
+        <tr><td>Tracking courier externo</td><td>No (manual)</td><td>API por proveedor</td><td>—</td></tr>
+        <tr><td>Reportes con datos en tiempo real</td><td>No (latencia 30-60 min)</td><td>Caché Redis + eventos</td><td>—</td></tr>
+        <tr><td>App móvil nativa</td><td>No</td><td>—</td><td>PWA → Android/iOS</td></tr>
+      </table>
+    </article>
+
   </main>
 
   <script src="js/navigation.js"></script>

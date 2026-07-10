@@ -303,7 +303,56 @@ Roles acumulativos (cada uno hereda del anterior):
 
 ---
 
-## 8. DIAGRAMA DE TOPOLOGÍA (SVG)
+## 8. ESTRUCTURA Y OPERACIÓN INTERNA
+
+### 8.1 Core Backend: Directorios (DDD Ligero)
+Se rechaza la estructura MVC plana en favor de `app/Domain/<Nombre>/` con Models, Actions, Jobs y Rules autocontenidos por módulo.
+
+**Módulos:**
+- `Domain/Identity/`: Users, Roles, autenticación, consentimiento Ley 21.719
+- `Domain/Inventory/`: Products, StockMovement, Branches, ajustes y transferencias
+- `Domain/Sales/`: Sales, Customers, Payments, rutas de despacho
+- `Domain/Sync/`: CanalWoo, Jobs de sincronización, WebhookHandlers, WooCommerceApiClient, resolutores de conflictos (FieldOwnershipResolver, TimestampConflictResolver)
+- `Domain/Reporting/`: Pre-agregación, tablas de resumen
+
+**Principios:** Controllers delgados, Actions con una responsabilidad, Jobs en su dominio, Enums y DTOs tipifican el dominio.
+
+### 8.2 Reportería y Rendimiento (Pre-agregación)
+Regla de oro: prohibido calcular reportes en tiempo real sobre tablas transaccionales. Jobs programados consolidan datos en tablas de resumen.
+
+**Jobs:**
+- `AggregateDailySales`: Cada 30-60 min, agrupa ventas por sucursal × método de pago × fecha → `daily_sales_summaries`
+- `SnapshotStock`: Cada 15-30 min, foto del stock por producto × sucursal → `stock_snapshots`
+
+**Tablas de resumen:**
+| Tabla | Propósito | Frecuencia |
+|-------|-----------|------------|
+| daily_sales_summaries | Ventas agregadas | 30-60 min |
+| stock_snapshots | Foto de stock | 15-30 min |
+| branch_product_stock | Stock actual denormalizado | Tiempo real (eventos) |
+| monthly_sales_summaries | Agregación mensual | Diario |
+
+**Latencia aceptada:** Reportes con hasta 60 min de retraso. Toda transacción POS debe completarse en <500ms.
+
+---
+
+## 9. FRONTERA DEL MVP Y BACKLOG FASE 2
+
+### 9.1 Límites del MVP
+
+| Funcionalidad | MVP | Fase 2 | Fase 3 |
+|---------------|-----|--------|--------|
+| POS con ventas y descuentos | Sí | — | — |
+| Webpay presencial | No (manual) | Bridge Node.js o API 2.0 | — |
+| Facturación DTE | No (comprobante interno) | Integración PayMe | — |
+| Modo Offline | No (requiere conexión) | — | PWA + IndexedDB |
+| Enrutamiento geográfico | No (Modo A/B) | Algoritmo + cobertura | — |
+| Tracking courier | No (manual) | API por proveedor | — |
+| Reportes en tiempo real | No (latencia 30-60 min) | Caché Redis | — |
+
+---
+
+## 10. DIAGRAMA DE TOPOLOGÍA (SVG)
 
 El diagrama de topología está embebido en `index.html` (sección 2.3) y muestra:
 
@@ -344,7 +393,7 @@ El diagrama de topología está embebido en `index.html` (sección 2.3) y muestr
 
 ---
 
-## 10. REFERENCIAS Y RECURSOS
+## 11. REFERENCIAS Y RECURSOS
 
 - Laravel 11: https://laravel.com/docs/11.x
 - Inertia.js: https://inertiajs.com/
