@@ -15,7 +15,8 @@
       subs: [
         { id: 'contexto', title: 'Contexto del Producto' },
         { id: 'modelo-standalone', title: 'Modelo Standalone (Local-First)' },
-        { id: 'alcance-mvp', title: 'Alcance del MVP' }
+        { id: 'alcance-mvp', title: 'Alcance del MVP' },
+        { id: 'analisis', title: 'Análisis Técnico y Requerimientos' }
       ]
     },
     {

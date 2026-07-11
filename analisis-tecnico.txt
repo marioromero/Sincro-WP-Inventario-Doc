@@ -1,0 +1,179 @@
+Análisis Técnico — POS + Inventario Multi-Sucursal
+Especificación de Requerimientos y Vistas del Sistema
+
+01 · Visión General
+Análisis Técnico y Especificación de Requerimientos
+Documento de análisis que define el alcance funcional, las pantallas del sistema y los requerimientos que originan esta solución, incluyendo aquellos postergados a fases posteriores.
+
+Objetivo General
+Diseñar y construir un sistema POS con inventario multi-sucursal que actúe como capa intermedia entre WooCommerce y los puntos de venta físicos, resolviendo la desconexión entre el canal digital y presencial mediante una fuente de verdad única de stock, precios y catálogo, operable en infraestructura de hosting compartido (cPanel) sin dependencia de servicios externos no estándar.
+
+Objetivos Específicos
+1. Operación POS ininterrumpida: Proveer una interfaz de caja rápida, táctil y responsive que permita completar una venta en menos de 15 segundos, con soporte para múltiples medios de pago, descuentos por línea y globales, y emisión de comprobante interno.
+2. Gestión de inventario multi-sucursal: Mantener stock segregado por sucursal con trazabilidad completa (ledger de movimientos), transferencias entre branches, ajustes con razón obligatoria, y alertas de stock crítico.
+3. Sincronización bidireccional con WooCommerce: Publicar cambios de stock, precios y productos desde el POS hacia WooCommerce, e importar pedidos web y actualizaciones de catálogo desde WooCommerce hacia el POS, con resolución de conflictos vía Field Ownership.
+4. Gestión de pedidos web y rutas de despacho: Recibir pedidos desde WooCommerce, gestionar su asignación a sucursales (manual o automática) y actualizar estados hasta el despacho final.
+5. Control de caja y arqueo: Permitir apertura y cierre de sesiones de caja por estación POS, con desglose por medio de pago y detección de diferencias (sobrantes/faltantes).
+6. Gestión de catálogo con variantes: Administrar productos con variantes (talla, color), categorías, atributos, etiquetas, marcas, combos y promociones, con precios globales por variante.
+7. Seguridad y cumplimiento normativo: Implementar roles acumulativos (Cashier, Supervisor, CentralAdmin), cifrado de datos sensibles (Ley 21.719) y auditoría de accesos.
+
+Descripción de Vistas del Sistema
+
+1. Pantalla de Login
+Tipo: Pública (solo acceso a recuperación de contraseña).
+Descripción: Formulario minimalista centrado con campo de email/usuario y contraseña, enlace de recuperación y selector de idioma (opcional). Fondo con el logo del comercio o un patrón sutil. Sin elementos distractores. Al iniciar sesión, el sistema redirige según el rol: si es Cashier va directamente al POS; si es Supervisor o CentralAdmin va al dashboard administrativo.
+UX: Transición suave al validar credenciales. Soporte para autocompletado del navegador. Mensajes de error claros sin revelar si el usuario existe.
+
+2. Dashboard Administrativo (Solo Supervisor y CentralAdmin)
+Tipo: Privada — rol Supervisor o CentralAdmin.
+Descripción: Vista de inicio con tarjetas-resumen (ventas del día, pedidos pendientes, alertas de stock, sesiones de caja abiertas). Gráficos sencillos de tendencia semanal. Accesos directos a las funciones más usadas según el perfil. Barra lateral colapsable con navegación por módulos. Selector de sucursal en la barra superior para filtrar toda la visualización.
+UX: Diseño limpio tipo Defontana pero más aerodinámico: tarjetas con sombras suaves, tipografía clara, espaciado generoso. Sin sobrecarga de indicadores. Los números relevantes (total ventas, tickets) destacan con tamaño mayor. Los accesos a funciones se despliegan de forma natural: al pasar el mouse sobre un módulo aparecen las acciones disponibles.
+
+3. Pantalla de POS (Caja)
+Tipo: Privada — rol Cashier o superior.
+Descripción: Es la pantalla más crítica del sistema. Diseñada como una interfaz completamente distinta al panel administrativo. Ocupa el 100% del viewport sin barras de navegación del sistema (solo una barra superior delgada con: sucursal, estación POS, nombre del cajero, y botón de cierre de sesión). Dividida en tres zonas funcionales:
+- Zona izquierda o superior (selección de productos): Buscador con campo de texto, botones de filtro rápido por categoría (como pestañas horizontales desplazables), y grilla de productos con imágenes pequeñas, nombre, precio y stock. La grilla debe adaptarse al espacio disponible: si la pantalla es ancha muestra más columnas; si es angosta, menos. Soporte para scroll infinito o paginación por carga diferida.
+- Zona central o inferior (carrito): Lista de ítems agregados con cantidad, precio unitario, subtotal y botón de eliminar. Al pie: subtotal, descuentos aplicados y total. Botón grande de "Cobrar" que abre un modal de pago.
+- Teclado numérico virtual: Siempre visible en la interfaz POS, optimizado para uso táctil. Con dígitos del 0-9, punto decimal, retroceso y tecla de "cantidad exacta". Permite cambiar cantidades sin usar el teclado físico.
+UX detallada:
+- Responsividad extrema: La interfaz debe reordenar sus zonas según la relación de aspecto. En monitores apaisados (16:9): productos a la izquierda (40%), carrito a la derecha (60%) con teclado numérico flotante. En vertical o tablets (3:4 o 9:16): productos arriba (50%), carrito abajo (50%), teclado numérico integrado en la zona del carrito. En pantallas casi cuadradas (1:1): diseño en tres filas (buscador + filtros, productos, carrito + teclado).
+- Optimización táctil: Botones de mínimo 48x48px. Gestos de deslizamiento para eliminar ítems del carrito o cambiar cantidades. Feedback háptico visual (cambio de color/brillo) al presionar. Área de scroll con indicador de posición visible.
+- Comandos de teclado: F1 = buscar producto, F2 = cobrar, F3 = cancelar venta, F4 = descuento, Escape = cerrar modal/lateral, Enter = confirmar pago. Atajos visibles en tooltips al mantener presionado el botón en táctil.
+- Modal de pago: Se abre sobre el carrito sin redirigir ni abrir ventanas. Muestra el total a cobrar, selector de medio de pago (efectivo, débito, crédito, transferencia, otro), campo de monto recibido (con teclado numérico), cálculo de vuelto. Soporta pagos mixtos (ej. mitad efectivo, mitad tarjeta). Al confirmar, el modal muestra resumen de la venta y botón de imprimir ticket, con opción de "Nueva Venta" que limpia el carrito sin cerrar el modal.
+- Búsqueda de productos: Por nombre, SKU o código de barras. Filtros rápidos: categoría (pestañas horizontales), etiqueta, marca, más vendidos, novedades. Los filtros se muestran solo cuando hay más de un valor disponible, evitando saturar. Resultados en tarjetas con imagen, nombre y precio; al tocar se agrega al carrito con cantidad 1.
+- Elegante y minimalista: Paleta de colores sobria (fondos claros, acentos en un solo color, tipografía sans-serif limpia). Sin bordes agresivos ni sombras excesivas. Los elementos interactivos tienen micro-interacciones (escala sutil al presionar, cambio de color suave al pasar el cursor).
+
+4. Gestión de Productos (Backoffice)
+Tipo: Privada — rol CentralAdmin (Supervisor solo lectura).
+Descripción: Vista de administración del catálogo con tabla de productos (imagen, nombre, SKU, precio, stock total, estado). Barra de búsqueda y filtros (categoría, marca, etiqueta, activo/inactivo). Botón "Nuevo Producto" que abre un formulario en modal o página completa con pestañas (Información General, Variantes, Precios, Atributos, Imágenes, Sincronización WooCommerce). Las variantes se definen por combinación de atributos (talla + color) con precio propio y SKU.
+UX: La tabla usa carga diferida (server-side pagination) para catálogos grandes. Las acciones (editar, clonar, desactivar) están en un menú contextual al hacer clic derecho o en un botón de tres puntos. El formulario es progresivo: primero se llenan los datos obligatorios (nombre, SKU, precio), luego se expanden secciones opcionales (variantes, atributos, imágenes).
+
+5. Gestión de Inventario y Stock
+Tipo: Privada — rol Supervisor o CentralAdmin.
+Descripción: Vista de stock por sucursal con tabla: producto, variante, stock actual, stock reservado, punto de reorden. Botones de "Ajustar Stock" (abre modal con selector de tipo de movimiento, cantidad y razón obligatoria) y "Transferir Stock" (abre modal con sucursal origen, sucursal destino, producto y cantidad). Gráfico de tendencia de stock para productos seleccionados. Historial de movimientos filtrable por fecha, tipo y usuario.
+
+6. Gestión de Sucursales y Tiendas WooCommerce
+Tipo: Privada — rol CentralAdmin.
+Descripción: Listado de sucursales con datos de contacto, horarios y configuración POS. Cada sucursal tiene sus tiendas WooCommerce asociadas (Store) con credenciales API (cifradas). Formulario de creación con mapa para seleccionar ubicación (opcional). Vista de detalle con pestañas: Información, Stock, Usuarios asignados, Tiendas WooCommerce, Cobertura de despacho.
+
+7. Gestión de Pedidos
+Tipo: Privada — rol Supervisor o CentralAdmin.
+Descripción: Listado de pedidos con filtros (estado, sucursal, fecha, origen: web/POS). Cada pedido muestra items, cliente, total y estado. Vista de detalle con acciones disponibles según el estado (asignar a sucursal, preparar, marcar como despachado, cancelar). Los pedidos web llegan con estado en_transito y se asignan a sucursal para despacho.
+
+8. Gestión de Usuarios y Roles
+Tipo: Privada — rol CentralAdmin.
+Descripción: Listado de usuarios con búsqueda y filtro por rol. Formulario de creación con nombre, email, contraseña, rol asignado y sucursales asociadas (selector múltiple para Supervisores y CentralAdmin). Vista de detalle con historial de accesos y sesiones activas.
+
+9. Configuración y Licencia
+Tipo: Privada — rol CentralAdmin.
+Descripción: Vista de configuración global del sistema con secciones: datos del comercio (nombre, RUT, logo), configuración de sincronización (intervalo de reconciliación, reintentos), configuración de licencia (estado, clave, días restantes), y registro de auditoría (log de accesos). La sección de licencia muestra si está activa, fecha de expiración y opciones de renovación.
+
+10. Pantalla de Reportes
+Tipo: Privada — rol Supervisor (sucursal) o CentralAdmin (global).
+Descripción: Vista de reportes con selector de tipo (ventas diarias, ventas por producto, stock por sucursal, arqueo de caja, movimientos de inventario), rango de fechas y sucursal. Los reportes se muestran en tabla con opción de exportar a PDF/Excel. Gráficos de barras y líneas para tendencias. Los datos provienen de tablas pre-agregadas (daily_sales_summaries, daily_stock_summaries) para evitar consultas pesadas al ledger.
+
+11. Gestión de Promociones
+Tipo: Privada — rol CentralAdmin.
+Descripción: CRUD de promociones con campos: nombre, tipo (descuento porcentaje, monto fijo, precio fijo, NxM), valor, fechas de vigencia, canal aplicable (POS, web, ambos), condiciones (productos, categorías, sucursales, cantidad mínima). Listado con indicador de estado (activa, vencida, programada). Las promociones no son acumulables entre sí; el sistema aplica automáticamente la de mayor descuento.
+
+12. Historial de Sincronización
+Tipo: Privada — rol CentralAdmin.
+Descripción: Vista de monitoreo de la sincronización con WooCommerce. Tabla con eventos de sync (tipo, estado, fecha, mensaje de error si falló). Botones para forzar sincronización manual de un producto o del stock completo. Indicador de salud de la conexión con cada tienda WooCommerce.
+
+Requerimientos Funcionales (RF)
+
+Código | Requerimiento | MVP
+RF-01 | El sistema debe permitir iniciar sesión con email y contraseña, y redirigir al POS si el rol es Cashier o al Dashboard si es Supervisor/CentralAdmin. | Sí
+RF-02 | El sistema debe permitir la recuperación de contraseña mediante enlace enviado por email. | Sí
+RF-03 | El sistema debe mantener sesiones de usuario con expiración por inactividad configurable. | Sí
+RF-04 | El sistema debe permitir al Cashier abrir y cerrar una sesión de caja asociada a una estación POS y sucursal. | Sí
+RF-05 | El sistema debe permitir al Cashier buscar productos por nombre, SKU o código de barras desde la interfaz POS. | Sí
+RF-06 | El sistema debe permitir al Cashier agregar productos al carrito, cambiar cantidad, eliminar líneas y ver el total actualizado en tiempo real. | Sí
+RF-07 | El sistema debe permitir al Cashier aplicar descuentos por línea de producto y descuentos globales al total de la venta. | Sí
+RF-08 | El sistema debe permitir al Cashier seleccionar uno o múltiples medios de pago (efectivo, débito, crédito, transferencia, otro) en una venta (pago mixto). | Sí
+RF-09 | El sistema debe calcular el vuelto cuando el pago es en efectivo y el monto recibido supera el total. | Sí
+RF-10 | El sistema debe emitir un comprobante interno (ticket no tributario) al finalizar la venta, con logo, datos de sucursal, items, totales y leyenda legal. | Sí
+RF-11 | El sistema debe descontar stock del ledger al confirmar una venta POS (movimiento tipo sale_pos). | Sí
+RF-12 | El sistema debe permitir al Supervisor anular ventas, generando un movimiento de reversión en el ledger. | Sí
+RF-13 | El sistema debe mostrar una advertencia visual si el stock de un producto llega a 0, pero permitir al Cashier forzar la venta. | Sí
+RF-14 | El sistema debe mantener un Stock Ledger inmutable con trazabilidad completa (quién, qué, cuándo, por qué) para cada movimiento de inventario. | Sí
+RF-15 | El sistema debe permitir ajustes de inventario con tipo de movimiento, cantidad, razón obligatoria y usuario responsable. | Sí
+RF-16 | El sistema debe permitir transferencias de stock entre sucursales en dos pasos (salida de origen, entrada en destino). | Sí
+RF-17 | El sistema debe calcular el stock disponible por sucursal como la suma de movimientos del ledger. | Sí
+RF-18 | El sistema debe permitir al CentralAdmin crear, editar y desactivar productos con variantes (talla, color) y precios globales. | Sí
+RF-19 | El sistema debe permitir al CentralAdmin gestionar categorías, atributos, etiquetas y marcas del catálogo. | Sí
+RF-20 | El sistema debe permitir al CentralAdmin crear productos tipo combo con componentes y cantidades. | Sí
+RF-21 | El sistema debe permitir al CentralAdmin crear y gestionar promociones con condiciones y fechas de vigencia. | Sí
+RF-22 | El sistema debe evaluar y aplicar promociones automáticamente al carrito, seleccionando la de mayor descuento cuando múltiples apliquen. | Sí
+RF-23 | El sistema debe sincronizar stock, precios, productos y variantes desde el POS hacia WooCommerce de forma asíncrona (cola de jobs). | Sí
+RF-24 | El sistema debe recibir pedidos web desde WooCommerce mediante webhook y crear registros de venta en estado en_transito. | Sí
+RF-25 | El sistema debe actualizar el stock en WooCommerce cuando ocurre una venta POS, ajuste o transferencia. | Sí
+RF-26 | El sistema debe resolver conflictos de catálogo usando Field Ownership (POS dueño de price/stock, WooCommerce dueño de description/images). | Sí
+RF-27 | El sistema debe permitir al Supervisor asignar pedidos web a sucursales para despacho (Modo B). | Sí
+RF-28 | El sistema debe actualizar el estado del pedido en WooCommerce cuando cambia en el POS. | Sí
+RF-29 | El sistema debe permitir al CentralAdmin gestionar sucursales (crear, editar, desactivar) con datos de contacto, horarios y configuración POS. | Sí
+RF-30 | El sistema debe permitir al CentralAdmin gestionar tiendas WooCommerce (Store) por sucursal con credenciales API cifradas. | Sí
+RF-31 | El sistema debe permitir al CentralAdmin crear usuarios y asignarles un rol (Cashier, Supervisor, CentralAdmin) y una o varias sucursales. | Sí
+RF-32 | El sistema debe validar que un usuario solo acceda a datos de las sucursales a las que está asignado. | Sí
+RF-33 | El sistema debe cifrar datos sensibles (RUT, email, teléfono, credenciales API) en reposo con AES-256. | Sí
+RF-34 | El sistema debe registrar en un log de auditoría todos los accesos a datos de clientes (quién, cuándo, qué acción, IP). | Sí
+RF-35 | El sistema debe permitir al Supervisor cerrar sesión de caja con desglose de montos por medio de pago y detectar diferencias. | Sí
+RF-36 | El sistema debe mostrar reportes pre-agregados de ventas diarias y stock por sucursal (datos no en tiempo real, latencia 30-60 min). | Sí
+RF-37 | El sistema debe validar webhooks entrantes de WooCommerce usando HMAC-SHA256 con el webhook_secret de la Store correspondiente. | Sí
+RF-38 | El sistema debe reintentar jobs de sincronización fallidos con backoff exponencial (5 reintentos). | Sí
+RF-39 | El sistema debe verificar la validez de la licencia al iniciar sesión y periódicamente mediante el LicenseValidator. | Sí
+RF-40 | El sistema debe permitir al CentralAdmin ingresar una clave de licencia y verificar su vigencia contra un servicio externo (o stub en MVP). | Sí
+RF-41 | El sistema debe bloquear el acceso si la licencia está vencida o es inválida (excepto la página de configuración de licencia). | Sí
+RF-42 | El sistema debe permitir al CentralAdmin gestionar estaciones POS dentro de una sucursal (crear, nombrar, activar/desactivar). | Sí
+RF-43 | El sistema debe permitir al CentralAdmin gestionar clientes (CRUD) con datos personales cifrados y consentimientos. | Sí
+RF-44 | El sistema debe ejecutar un job programado de reconciliación de stock entre POS y WooCommerce en ventanas de bajo tráfico. | Sí
+RF-45 | El sistema debe permitir al CentralAdmin forzar la sincronización manual de un producto o del stock completo hacia WooCommerce. | Sí
+RF-46 | El sistema debe integrarse con Webpay Plus Presencial (terminal POS físico de Transbank) para pago con tarjeta presencial. | No (F2)
+RF-47 | El sistema debe emitir Documentos Tributarios Electrónicos (DTE) — boleta y factura electrónica — a través de un proveedor autorizado (PayMe). | No (F2)
+RF-48 | El sistema debe permitir importar/exportar productos mediante archivo CSV para carga masiva. | No (F2)
+RF-49 | El sistema debe asignar pedidos web automáticamente según la comuna de envío (enrutamiento geográfico, Modo C). | No (F2)
+RF-50 | El sistema debe integrarse con servicios de tracking externos (Chilexpress, Starken, Bluexpress) para actualizar estado de despacho. | No (F2)
+RF-51 | El sistema debe proporcionar reportes avanzados con datos en tiempo real (caché Redis + eventos de dominio). | No (F2)
+RF-52 | El sistema debe gestionar proveedores y órdenes de compra con recepción parcial y generación automática de movimientos de entrada. | No (F2)
+RF-53 | El sistema debe incluir un wizard de instalación guiado para el onboarding inicial. | No (F2)
+RF-54 | El sistema debe integrarse con sistemas contables (Tally, Siigo, Defontana) para exportación de asientos contables. | No (F3)
+RF-55 | El sistema debe proporcionar una aplicación móvil nativa (Android/iOS) para consulta de stock y pedidos. | No (F3)
+RF-56 | El sistema debe incluir un programa de fidelización (puntos, historial de cliente, ofertas personalizadas). | No (F3)
+RF-57 | El sistema debe operar en modo offline (PWA con IndexedDB) cuando la conexión a internet no está disponible. | No (F3)
+
+Requerimientos No Funcionales (RNF)
+
+Experiencia de Usuario y Estilo de Interfaces
+
+Código | Requerimiento | MVP
+RNF-01 | Diseño minimalista tipo Defontana: La interfaz administrativa debe usar una paleta de colores sobria con fondos claros (#f8f9fa o similar), acentos en un solo color de marca, tipografía sans-serif limpia (Inter o sistema), bordes suaves y espaciado generoso. Sin gradientes agresivos, sombras excesivas ni elementos decorativos que no aporten información. | Sí
+RNF-02 | POS visualmente distinto del backoffice: La interfaz de caja (POS) debe usar un layout completamente diferente al panel administrativo. Sin sidebar, sin menús de navegación. Solo una barra superior delgada con datos de contexto (sucursal, cajero, estación). El POS debe ocupar el 100% del viewport y no compartir elementos de navegación con el backoffice. | Sí
+RNF-03 | Responsividad extrema del POS: La interfaz POS debe reordenar sus zonas funcionales (buscador, grilla de productos, carrito, teclado numérico) según la relación de aspecto del viewport: apaisado (16:9), vertical (9:16), casi cuadrado (1:1) y cualquier resolución intermedia. Debe funcionar correctamente en monitores de 1920x1080, pantallas táctiles de 1366x768 y tablets en cualquier orientación. | Sí
+RNF-04 | Optimización táctil: Todos los botones y elementos interactivos del POS deben tener un área táctil mínima de 48x48 píxeles. La interfaz debe soportar gestos de deslizamiento para acciones comunes (eliminar ítem, cambiar cantidad). Feedback visual inmediato al presionar (cambio de color/brillo con transición suave <200ms). | Sí
+RNF-05 | Soporte multimodal (táctil, teclado, ratón): El POS debe ser operable completamente con comandos de teclado (F1 a F12 para acciones principales, Escape para cerrar modales, Enter para confirmar, Tab para navegar campos), con ratón (clic en botones grandes, arrastrar para cambiar cantidades) y con pantalla táctil (toque directo, gestos). Los atajos de teclado deben ser visibles en la interfaz mediante tooltips. | Sí
+RNF-06 | Teclado numérico virtual integrado: El POS debe incluir un teclado numérico siempre visible en la interfaz para ingreso de cantidades, precios y montos de pago. Diseñado con botones grandes para uso táctil. Debe incluir dígitos 0-9, punto decimal, retroceso y tecla de confirmación. El teclado numérico no debe superponerse a la grilla de productos ni al carrito. | Sí
+RNF-07 | Modales sin apertura de ventanas: Todas las interacciones secundarias en el POS (pago, ajuste de cantidad, aplicación de descuento, confirmación de anulación) deben abrirse en modales superpuestos, nunca en ventanas nuevas, pestañas nuevas ni redirecciones. Los modales deben tener animación de entrada sutil, fondo semitransparente y cierre con clic fuera o tecla Escape. | Sí
+RNF-08 | Progressive disclosure (divulgación progresiva): Las interfaces no deben saturar al usuario con opciones. Deben mostrar inicialmente solo los elementos esenciales y desplegar opciones adicionales de forma natural a medida que se necesitan. Ejemplo: los filtros de búsqueda avanzada aparecen al hacer clic en "Más filtros"; los campos opcionales de un formulario se expanden al marcar una casilla. | Sí
+RNF-09 | Filtros de búsqueda inteligentes: La grilla de productos del POS debe ofrecer filtros por categoría (pestañas horizontales desplazables si son muchas), etiqueta, marca y un acceso rápido a "Más vendidos". Los filtros se muestran solo cuando hay más de un valor disponible. El buscador debe soportar búsqueda por nombre, SKU y código de barras simultáneamente. | Sí
+RNF-10 | Tiempo de venta POS: Un operador entrenado debe poder completar una venta de un producto en menos de 15 segundos desde que el cliente llega a caja hasta la emisión del comprobante. Esto incluye: seleccionar producto, definir cantidad si no es 1, seleccionar medio de pago y confirmar. | Sí
+RNF-11 | Carga inicial del POS: La interfaz POS debe cargar y estar operativa en menos de 3 segundos en conexiones de banda ancha básica (10 Mbps). La grilla de productos debe mostrar resultados iniciales en menos de 1 segundo. | Sí
+RNF-12 | Consistencia visual en todo el sistema: Todos los formularios, tablas, modales, botones y notificaciones deben seguir el mismo patrón de diseño en todo el sistema. Los colores, tipografías, espaciados y comportamientos deben ser uniformes entre el backoffice y el POS (aunque el layout sea distinto). | Sí
+RNF-13 | Notificaciones no intrusivas: Las notificaciones de éxito, error y advertencia deben aparecer como toast en la esquina superior derecha con auto-dismiss (3s éxito, 5s error). No deben usar alert() ni confirm() del navegador. Deben tener icono identificativo y color semántico (verde éxito, rojo error, amarillo advertencia). | Sí
+RNF-14 | Estados vacíos informativos: Cuando una tabla o lista no tiene datos, debe mostrar un mensaje amigable con una ilustración sutil y una acción sugerida (ej. "No hay productos aún. Crea tu primer producto." con botón de acceso directo). | Sí
+RNF-15 | Confirmación de acciones destructivas: Toda acción que elimine, desactive o modifique datos críticos (anular venta, eliminar producto, desactivar sucursal) debe solicitar confirmación explícita mediante un modal de doble paso: "¿Estás seguro?" con descripción del impacto y botón de confirmación resaltado en rojo. | Sí
+RNF-16 | Tipografía y legibilidad: Tamaño de fuente base mínimo de 16px en el POS (para lectura en pantallas táctiles desde distancia de operación) y 14px en backoffice. Contraste de color que cumpla WCAG AA (relación de contraste mínima 4.5:1 para texto normal). | Sí
+
+Rendimiento, Seguridad y Portabilidad
+
+Código | Requerimiento | MVP
+RNF-17 | Disponibilidad: El sistema debe operar sin interrupciones programadas. Las tareas de mantenimiento (reconciliación de stock, pre-agregación de reportes) se ejecutan en ventanas de bajo tráfico sin afectar la operación del POS. | Sí
+RNF-18 | Rendimiento de consultas: Las consultas al Stock Ledger para calcular stock disponible deben ejecutarse en menos de 500ms para catálogos de hasta 100k movimientos por sucursal. | Sí
+RNF-19 | Seguridad de sesión: Las sesiones deben expirar por inactividad después de un período configurable (default 30 minutos para POS, 60 minutos para backoffice). Las contraseñas deben almacenarse con hash bcrypt. | Sí
+RNF-20 | Portabilidad en hosting compartido: El sistema debe funcionar en hosting cPanel con PHP 8.2+, MySQL 8 / MariaDB 10.6+ y Node.js para compilación de assets. Sin dependencia de Redis, demonios persistentes ni servicios externos no disponibles en hosting compartido chileno típico. | Sí
+RNF-21 | Mecanismo de licencia: El sistema debe implementar un LicenseValidator con Dependency Inversion. En MVP usa un stub que siempre retorna true. La arquitectura debe permitir reemplazar el stub por un servicio cloud sin modificar el dominio. La licencia se verifica al iniciar sesión y cada 24 horas. Si la licencia expira, el sistema debe mostrar una advertencia y permitir el acceso solo a la página de configuración de licencia. | Sí
+RNF-22 | Latencia de sincronización: El stock actualizado en el POS debe reflejarse en WooCommerce en menos de 2 minutos en condiciones normales de red. | Sí
+RNF-23 | Resiliencia de colas: Los jobs fallidos deben reintentarse hasta 5 veces con backoff exponencial (30s, 2min, 5min, 15min, 30min) antes de pasar a dead letter queue. | Sí
+RNF-24 | Auditoría de datos sensibles: Todo acceso a datos de clientes (RUT, email, teléfono) debe registrarse con timestamp, usuario, IP y acción. El log debe ser inmodificable y exportable para cumplimiento normativo. | Sí
+RNF-25 | Integridad del Stock Ledger: El ledger de movimientos debe ser inmutable (no se permiten UPDATE ni DELETE sobre movimientos registrados). Las correcciones se hacen mediante movimientos de reversión. | Sí
+RNF-26 | Notificaciones push (Fase 2): El sistema debe enviar notificaciones al navegador del Supervisor cuando ocurran eventos críticos (stock crítico, pedido nuevo, diferencia de caja). | No (F2)
+RNF-27 | Modo offline (Fase 3): El sistema debe poder operar sin conexión a internet utilizando IndexedDB en el navegador y sincronizar al reconectar. | No (F3)
