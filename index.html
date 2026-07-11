@@ -447,6 +447,7 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>comuna</td><td>VARCHAR(100)</td><td>Sí</td><td>NULL</td><td>INDEX</td><td>Comuna (para futuro enrutamiento)</td></tr>
           <tr><td>es_virtual</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>0</td><td>—</td><td>1 = bodega online sin atención presencial</td></tr>
           <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Si está operativa</td></tr>
+          <tr><td>requiere_control_caja</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>—</td><td>Si 0, la sucursal no exige abrir sesión de caja para vender (venta directa sin arqueo)</td></tr>
           <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
           <tr><td>deleted_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Soft delete</td></tr>
         </table>
@@ -658,6 +659,7 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
           <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → sucursales.id (RESTRICT)</td><td>Sucursal</td></tr>
           <tr><td>usuario_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → usuarios.id (RESTRICT)</td><td>Cajero responsable</td></tr>
+          <tr><td>estacion_pos_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → estaciones_pos.id (SET NULL)</td><td>Estación POS desde la que se abrió la sesión (opcional). NULL si la sucursal no tiene control de caja</td></tr>
           <tr><td>monto_inicial</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Monto declarado al abrir</td></tr>
           <tr><td>monto_final_declarado</td><td>DECIMAL(12,2) UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Monto contado al cerrar</td></tr>
           <tr><td>monto_final_sistema</td><td>DECIMAL(12,2) UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Monto esperado según ventas</td></tr>
@@ -945,6 +947,33 @@ class LocalLicenseStub implements LicenseValidator
         </table>
       </details>
 
+      <!-- 6.2 estaciones_pos -->
+      <details>
+        <summary><strong>6.2 estaciones_pos</strong> — Estaciones físicas o lógicas de POS dentro de una sucursal</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → sucursales.id (CASCADE)</td><td>Sucursal a la que pertenece</td></tr>
+          <tr><td>nombre</td><td>VARCHAR(100)</td><td>No</td><td>—</td><td>—</td><td>Nombre visible (ej. "Caja 1", "Caja 2")</td></tr>
+          <tr><td>codigo</td><td>VARCHAR(30)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Código corto único (ej. SUC01-CAJA1)</td></tr>
+          <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Disponible para operar</td></tr>
+        </table>
+      </details>
+
+      <!-- 6.3 caja_cierre_medios_pago -->
+      <details>
+        <summary><strong>6.3 caja_cierre_medios_pago</strong> — Desglose por medio de pago declarado al cerrar la sesión de caja (arqueo)</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>sesion_caja_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → sesiones_caja.id (CASCADE)</td><td>Sesión de caja padre</td></tr>
+          <tr><td>medio_pago</td><td>ENUM('efectivo','tarjeta','transferencia','webpay','otro')</td><td>No</td><td>—</td><td>—</td><td>Medio de pago declarado</td></tr>
+          <tr><td>monto_sistema</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Monto esperado según ventas registradas en el sistema</td></tr>
+          <tr><td>monto_declarado</td><td>DECIMAL(12,2) UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Monto contado físicamente por el cajero al cerrar</td></tr>
+          <tr><td>diferencia</td><td>DECIMAL(12,2)</td><td>No</td><td>0.00</td><td>—</td><td>monto_declarado - monto_sistema (negativo = faltante, positivo = sobrante)</td></tr>
+        </table>
+      </details>
+
       <div class="warn-box">
         <strong>IMPORTANTE — Precedencia de promociones:</strong> Antes de programar la lógica de promociones, el equipo debe definir y documentar una regla de precedencia clara (ej. "la promoción de menor descuento gana", "solo una promoción por línea", "NxM se evalúa primero"). Sin esta regla, múltiples promociones aplicables a un mismo producto producirán resultados inconsistentes en <code>POST /ventas/preview</code> y en el cierre de venta final.
       </div>
@@ -965,6 +994,9 @@ class LocalLicenseStub implements LicenseValidator
         <li><code>ventas.cliente_id → clientes.id</code>, <code>ventas.tienda_id → tiendas.id</code>, <code>ventas.sucursal_id → sucursales.id</code></li>
         <li><code>venta_detalle.venta_id → ventas.id</code>, <code>venta_detalle.producto_variante_id → producto_variantes.id</code></li>
         <li><code>venta_detalle.promocion_id → promociones.id</code> (SET NULL, trazabilidad de promociones)</li>
+        <li><code>sesiones_caja.estacion_pos_id → estaciones_pos.id</code> (SET NULL)</li>
+        <li><code>caja_cierre_medios_pago.sesion_caja_id → sesiones_caja.id</code> (CASCADE)</li>
+        <li><code>estaciones_pos.sucursal_id → sucursales.id</code> (CASCADE)</li>
         <li><code>combo_componentes.combo_variante_id → producto_variantes.id</code> (CASCADE)</li>
         <li><code>combo_componentes.componente_variante_id → producto_variantes.id</code> (RESTRICT)</li>
         <li><code>promocion_condiciones.promocion_id → promociones.id</code> (CASCADE)</li>
@@ -2967,8 +2999,18 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
         <tr><td>GET</td><td><code>/sucursales</code></td><td>—</td><td>Renderiza listado de sucursales.</td></tr>
         <tr><td>POST</td><td><code>/sucursales</code></td><td>nombre, codigo, direccion, comuna</td><td>Crea la sucursal.</td></tr>
-        <tr><td>PUT</td><td><code>/sucursales/{id}</code></td><td>Mismos campos</td><td>Edita sucursal.</td></tr>
+        <tr><td>PUT</td><td><code>/sucursales/{id}</code></td><td>Mismos campos + requiere_control_caja (bool)</td><td>Edita sucursal. <strong>Nota:</strong> si <code>requiere_control_caja=false</code>, la sucursal no exigirá apertura de sesión de caja para operar el POS.</td></tr>
+        <tr><td>PATCH</td><td><code>/sucursales/{id}/control-caja</code></td><td>requiere_control_caja (bool)</td><td>Cambia rápidamente el flag de control de caja sin enviar todo el formulario de la sucursal.</td></tr>
         <tr><td>DELETE</td><td><code>/sucursales/{id}</code></td><td>—</td><td>Soft delete (bloqueado si hay historial).</td></tr>
+      </table>
+
+      <h3>3.1 Estaciones POS (Web — CRUD)</h3>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/estaciones-pos</code></td><td>sucursal_id (Query)</td><td>Renderiza listado de estaciones POS filtrable por sucursal.</td></tr>
+        <tr><td>POST</td><td><code>/estaciones-pos</code></td><td>sucursal_id, nombre, codigo, activa</td><td>Crea estación POS.</td></tr>
+        <tr><td>PUT</td><td><code>/estaciones-pos/{id}</code></td><td>nombre, codigo, activa</td><td>Edita estación POS. No permite cambiar de sucursal.</td></tr>
+        <tr><td>DELETE</td><td><code>/estaciones-pos/{id}</code></td><td>—</td><td>Soft delete. Las sesiones de caja históricas conservan la referencia.</td></tr>
       </table>
 
       <h3>4. Tiendas WooCommerce y Sincronización (Web)</h3>
@@ -3031,12 +3073,13 @@ Gate::define('manage-woo-channels', fn(User $user) =>
       </table>
 
       <h3>6. Caja y Ventas (Web — POS)</h3>
-      <p>El carrito vive en memoria (<a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Pinia</a>). Al finalizar la venta se hace una sola llamada al servidor.</p>
+      <p>El carrito vive en memoria (<a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Pinia</a>). Al finalizar la venta se hace una sola llamada al servidor. El control de caja es opcional por sucursal (según flag <code>requiere_control_caja</code>).</p>
       <table>
         <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
         <tr><td>GET</td><td><code>/pos</code></td><td>—</td><td>Renderiza interfaz principal del POS. Productos iniciales como props.</td></tr>
-        <tr><td>POST</td><td><code>/caja/abrir</code></td><td>monto_inicial</td><td>Abre sesión de caja del usuario actual.</td></tr>
-        <tr><td>POST</td><td><code>/caja/cerrar</code></td><td>monto_final_declarado</td><td>Cierra sesión y calcula descuadres.</td></tr>
+        <tr><td>POST</td><td><code>/caja/abrir</code></td><td>monto_inicial, estacion_pos_id (opcional)</td><td>Abre sesión de caja del usuario actual. <code>estacion_pos_id</code> vincula la sesión a una estación POS específica. Si la sucursal tiene <code>requiere_control_caja=0</code>, el POS puede operar sin abrir sesión.</td></tr>
+        <tr><td>POST</td><td><code>/caja/cerrar</code></td><td>montos_declarados[] ({ medio_pago, monto })</td><td>Cierra sesión de caja. Recibe un array con el detalle por medio de pago. El backend genera los registros en <code>caja_cierre_medios_pago</code>, calcula <code>monto_sistema</code> vs <code>monto_declarado</code> y persiste la diferencia. Retorna resumen del arqueo (totales, descuadres).</td></tr>
+        <tr><td>GET</td><td><code>/caja/{id}</code></td><td>—</td><td>Renderiza vista detallada de la sesión de caja. Incluye: datos de apertura/cierre, desglose por medio de pago (desde <code>caja_cierre_medios_pago</code>) y listado completo de todas las ventas de esa sesión para facilitar el arqueo visual del supervisor.</td></tr>
         <tr><td>POST</td><td><code>/ventas/preview</code></td><td>items[] (carrito Pinia)</td><td>Evalúa promociones activas sobre el carrito sin persistir nada. Retorna JSON con subtotales, descuentos aplicados y total final. Idempotente.</td></tr>
         <tr><td>POST</td><td><code>/ventas</code></td><td>items[], pagos[]</td><td>Recibe carrito desde Pinia. Descuenta stock, registra pago, encola sync a WooCommerce. Retorna redirect con ID del comprobante.</td></tr>
         <tr><td>POST</td><td><code>/ventas/{id}/confirmar-despacho</code></td><td>sucursal_id</td><td>Pasa pedido web de <code>en_transito</code> a completada. Actualiza inventario físico.</td></tr>
