@@ -629,7 +629,7 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
           <tr><td>branch_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → branches.id (RESTRICT)</td><td>Sucursal del movimiento</td></tr>
           <tr><td>product_variant_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → product_variants.id (RESTRICT)</td><td>Variante afectada</td></tr>
-          <tr><td>tipo_movimiento</td><td>ENUM('entrada','salida','venta_fisica','venta_web','ajuste','reserva','liberacion_reserva','devolucion')</td><td>No</td><td>—</td><td>INDEX</td><td>Tipo de movimiento</td></tr>
+          <tr><td>tipo_movimiento</td><td>ENUM('transfer_out','transfer_in','sale_pos','sale_web','adjustment','reservation','reservation_release','return','initial')</td><td>No</td><td>—</td><td>INDEX</td><td>Tipo de movimiento. <code>initial</code> para saldo inicial al activar producto, <code>transfer_*</code> para traslados entre branches</td></tr>
           <tr><td>cantidad</td><td>DECIMAL(12,3)</td><td>No</td><td>—</td><td>—</td><td>Cantidad (± según convención)</td></tr>
           <tr><td>store_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → stores.id (SET NULL)</td><td>Origen si es pedido web</td></tr>
           <tr><td>sale_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → sales.id (SET NULL)</td><td>Venta asociada</td></tr>
@@ -1356,37 +1356,36 @@ public function handle()
       </table>
 
       <h3>Esquema conceptual</h3>
-      <pre>Schema::create('stock_ledger', function (Blueprint \$table) {
+      <pre>Schema::create('stock_movements', function (Blueprint \$table) {
     \$table->id();
-    \$table->foreignId('product_id')->constrained();
+    \$table->foreignId('product_variant_id')->constrained('product_variants');
     \$table->foreignId('branch_id')->constrained('branches');
-    \$table->string('type');  // ver tabla de tipos arriba
-    \$table->integer('quantity');  // positivo = entrada, negativo = salida
-    \$table->integer('balance_after');  // saldo posterior, calculado al insertar
-    \$table->foreignId('user_id')->constrained();
-    \$table->nullableMorphs('reference');  // referencia polimórfica al documento origen
-    \$table->text('reason')->nullable();
+    \$table->string('type');  // ver ENUM definitivo arriba (transfer_out, sale_pos, etc.)
+    \$table->decimal('quantity', 12, 3);  // positivo = entrada, negativo = salida
+    \$table->foreignId('sale_id')->nullable()->constrained('sales');
+    \$table->foreignId('user_id')->nullable()->constrained('users');
+    \$table->text('comentario')->nullable();
     \$table->timestamps();
 
-    \$table->index(['product_id', 'branch_id', 'created_at']);
+    \$table->index(['product_variant_id', 'branch_id', 'created_at']);
 });</pre>
 
       <h3>Cálculo del stock disponible</h3>
       <p>No se almacena un campo "stock" calculado. El stock se obtiene sumando la tabla ledger:</p>
-      <pre>public function stockEnSucursal(Branch \$branch): int
+      <pre>public function stockEnBranch(Branch \$branch): float
 {
-    return (int) \$this->stockLedger()
+    return (float) \$this->stockMovements()
         ->where('branch_id', \$branch->id)
         ->sum('quantity');
 }</pre>
 
       <p>Para el stock "disponible real" se excluyen las reservas en tránsito:</p>
-      <pre>public function stockDisponible(Branch \$branch): int
+      <pre>public function stockDisponible(Branch \$branch): float
 {
-    return \$this->stockEnSucursal(\$branch)
-        - (int) \$this->stockLedger()
+    return \$this->stockEnBranch(\$branch)
+        - (float) \$this->stockMovements()
             ->where('branch_id', \$branch->id)
-            ->where('type', 'reserva_en_transito')
+            ->where('type', 'reservation')
             ->sum('quantity');
 }</pre>
 
@@ -1717,7 +1716,7 @@ public function handle()
           <text x="390" y="1306" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">stock_movements (Ledger — Fuente de verdad)</text>
           <text x="52" y="1331" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
           <text x="52" y="1345" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK branch_id (RESTRICT) / FK product_variant_id (RESTRICT)</text>
-          <text x="52" y="1359" font-family="Arial, sans-serif" font-size="9" fill="#333">tipo_movimiento: ENUM (8 tipos)</text>
+          <text x="52" y="1359" font-family="Arial, sans-serif" font-size="9" fill="#333">tipo_movimiento: ENUM (9 tipos)</text>
           <text x="52" y="1373" font-family="Arial, sans-serif" font-size="9" fill="#333">cantidad: DECIMAL(12,3) (±) / FK store_id / FK sale_id / FK user_id</text>
           <text x="52" y="1387" font-family="Arial, sans-serif" font-size="9" fill="#333">comentario: VARCHAR(255)</text>
           <text x="52" y="1401" font-family="Arial, sans-serif" font-size="8" fill="#c33">INDEX compuesto: (branch_id, product_variant_id, created_at)</text>
@@ -2384,11 +2383,11 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
       <p class="lead">Regla de oro: prohibido calcular reportes en tiempo real sobre tablas transaccionales. El rendimiento del POS es la prioridad máxima; la latencia en reportes es una decisión de diseño aceptada.</p>
 
       <div class="warn-box">
-        <strong>Riesgo crítico:</strong> Una consulta <code>SELECT SUM(quantity) FROM stock_ledger WHERE ...</code> sobre 500k movimientos mientras un cajero intenta cobrar en el POS puede congelar la base de datos compartida de <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a>. La pre-agregación no es optativa: es obligatoria para la viabilidad del sistema en producción.
+        <strong>Riesgo crítico:</strong> Una consulta <code>SELECT SUM(quantity) FROM stock_movements WHERE ...</code> sobre 500k movimientos mientras un cajero intenta cobrar en el POS puede congelar la base de datos compartida de <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a>. La pre-agregación no es optativa: es obligatoria para la viabilidad del sistema en producción.
       </div>
 
       <h3>Estrategia de pre-agregación</h3>
-      <p>En lugar de consultar las tablas transaccionales (<code>stock_ledger</code>, <code>sales</code>) para cada reporte, se ejecutan Jobs programados que consolidan los datos en tablas de resumen. Los reportes leen estas tablas pre-agregadas.</p>
+      <p>En lugar de consultar las tablas transaccionales (<code>stock_movements</code>, <code>sales</code>) para cada reporte, se ejecutan Jobs programados que consolidan los datos en tablas de resumen. Los reportes leen estas tablas pre-agregadas.</p>
 
       <h4>Job: AggregateDailySales</h4>
       <p>Se ejecuta cada 30-60 minutos. Agrupa las sales del día por sucursal, método de pago y categoría de producto, y escribe los totales en <code>daily_sales_summaries</code>.</p>
@@ -3083,7 +3082,7 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <tr><td>POST</td><td><code>/caja/cerrar</code></td><td>montos_declarados[] ({ medio_pago, monto })</td><td>Cierra sesión de caja. Recibe un array con el detalle por medio de pago. El backend genera los registros en <code>cash_closure_payments</code>, calcula <code>monto_sistema</code> vs <code>monto_declarado</code> y persiste la diferencia. Retorna resumen del arqueo (totales, descuadres).</td></tr>
         <tr><td>GET</td><td><code>/caja/{id}</code></td><td>—</td><td>Renderiza vista detallada de la sesión de caja. Incluye: datos de apertura/cierre, desglose por medio de pago (desde <code>cash_closure_payments</code>) y listado completo de todas las sales de esa sesión para facilitar el arqueo visual del supervisor.</td></tr>
         <tr><td>POST</td><td><code>/sales/preview</code></td><td>items[] (carrito Pinia)</td><td>Evalúa promotions activas sobre el carrito sin persistir nada. Retorna JSON con subtotales, descuentos aplicados y total final. Idempotente.</td></tr>
-        <tr><td>POST</td><td><code>/sales</code></td><td>items[], pagos[]</td><td>Recibe carrito desde Pinia. Descuenta stock, registra pago, encola sync a WooCommerce. Retorna redirect con ID del comprobante.</td></tr>
+        <tr><td>POST</td><td><code>/sales</code></td><td>items[], pagos[]</td><td>Recibe carrito desde Pinia. Descuenta stock, registra pago, encola sync a WooCommerce. Retorna redirect con ID del comprobante. <strong>Regla de negocio (stock cero/negativo):</strong> Si el stock disponible llega a 0, el POS físico muestra una advertencia visual pero permite al cajero forzar la venta (el producto está físicamente en mano). Para pedidos web entrantes, WooCommerce bloquea la venta automáticamente con su lógica nativa de stock; el sistema respeta esa decisión y no sobreescribe el stock en negativo desde la web.</td></tr>
         <tr><td>POST</td><td><code>/sales/{id}/confirmar-despacho</code></td><td>branch_id</td><td>Pasa pedido web de <code>en_transito</code> a completada. Actualiza inventario físico.</td></tr>
       </table>
 
@@ -3184,7 +3183,7 @@ Gate::define('manage-woo-channels', fn(User $user) =>
       <ul>
         <li>CRUD de Categorías y Products con variantes (talla/color) y precios multi-sucursal (tabla pivot <code>branch_product</code>).</li>
         <li>Importación/exportación CSV de products para carga masiva inicial.</li>
-        <li>Construir el <strong><a href="#" data-page="inventario-stock-ledger" onclick="location.hash='inventario-stock-ledger';return false;">Stock Ledger</a></strong> (tabla <code>stock_ledger</code>) con los 10 tipos de movimiento documentados en la sección 4.1.</li>
+        <li>Construir el <strong><a href="#" data-page="inventario-stock-ledger" onclick="location.hash='inventario-stock-ledger';return false;">Stock Ledger</a></strong> (tabla <code>stock_movements</code>) con los tipos de movimiento documentados en el diccionario (sección 5.1).</li>
         <li>Implementar <code>AdjustStockAction</code> y <code>TransferStockAction</code> como transacciones de base de datos que escriben en el ledger y actualizan el saldo denormalizado (<code>branch_product_stock</code>) si existe.</li>
         <li>Escribir tests unitarios para el ledger: verificar que el saldo calculado (SUM) coincida con el saldo esperado después de secuencias de movimientos (entrada, venta, ajuste, transferencia).</li>
       </ul>
