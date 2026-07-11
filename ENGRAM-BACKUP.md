@@ -478,6 +478,35 @@ Secuencia lógica de 6 pasos. No hay fechas ni estimaciones. Cada paso tiene un 
 
 ---
 
+## 10. PROTOCOLO DE MANTENCIÓN DE LA DOCUMENTACIÓN
+
+### 10.1 Regla de oro: relinkear siempre
+Cada vez que se agregue una página nueva, se corrija o se modifique contenido existente en `index.html`, se debe:
+1. **Relinkear los conceptos afectados:** revisar todas las páginas donde aparezcan los términos modificados y actualizar/agregar los enlaces cruzados (`<a href="#" data-page="...">`) correspondientes.
+2. **Buscar puntos de impacto aguas arriba y abajo:** antes de tocar una página, identificar qué otras secciones referencian ese concepto y ajustar la info o los links en ellas. Ejemplo: si se cambia la estructura del Stock Ledger, revisar `sincronizacion-*`, `inventario-*`, `backend-guide-*` y `hoja-ruta-pasos`.
+3. **No dejar enlaces huérfanos:** si se elimina una página, eliminar o redirigir todos los links que apuntaban a ella.
+
+### 10.2 Mapa de impacto crítico
+| Concepto / Página | Impacta en |
+|---|---|
+| `vision-general-modelo-standalone` | sincronizacion-*, backend-guide-*, hoja-ruta-pasos |
+| `inventario-stock-ledger` (Stock Ledger) | sincronizacion-*, ventas-*, backend-guide-servicios, backend-guide-rutas, hoja-ruta-pasos |
+| `inventario-sucursales` (Sucursales) | vision-general-*, sincronizacion-*, backend-guide-rutas, hoja-ruta-pasos |
+| `sincronizacion-webhooks` | inventario-*, backend-guide-middleware, backend-guide-rutas, hoja-ruta-pasos |
+| `backend-guide-queues` (Colas + Cron) | arquitectura-*, sincronizacion-*, backend-guide-*, hoja-ruta-pasos |
+| `cumplimiento-roles` | vision-general-*, backend-guide-middleware, backend-guide-rutas |
+| `frontend-guide-vue` | vision-general-*, arquitectura-stack, hoja-ruta-pasos |
+| `hoja-ruta-pasos` | todas las secciones (dependencia inversa: cambios en cualquier paso afectan la ruta) |
+
+### 10.3 Checklist antes de cerrar una edición
+- [ ] ¿Agregué/quitaré páginas? → actualizar `navigation.js` y relinkear.
+- [ ] ¿Toqué conceptos clave (Stock Ledger, cron, roles, sincronización)? → revisar mapa de impacto.
+- [ ] ¿Cambió la estructura de archivos del repo? → actualizar `interna-directorios` y `arquitectura-stack`.
+- [ ] ¿Cambió el alcance del MVP? → actualizar `vision-general-alcance-mvp` y `frontera-limites`.
+- [ ] ¿Corrí errores en tablas, rutas o ejemplos de código? → verificar que no haya info contradictoria en otras secciones.
+
+---
+
 ## 11. REFERENCIAS Y RECURSOS
 
 - Laravel 11: https://laravel.com/docs/11.x
