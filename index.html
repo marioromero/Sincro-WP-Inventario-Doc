@@ -564,7 +564,7 @@ class LocalLicenseStub implements LicenseValidator
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
           <tr><td>categoria_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → categorias.id (SET NULL)</td><td>Categoría principal</td></tr>
-          <tr><td>tipo</td><td>ENUM('simple','variable')</td><td>No</td><td>'simple'</td><td>INDEX</td><td>Tipo de producto</td></tr>
+          <tr><td>tipo</td><td>ENUM('simple','variable','combo')</td><td>No</td><td>'simple'</td><td>INDEX</td><td>Tipo de producto. <code>combo</code> indica que se descompone en componentes al venderse</td></tr>
           <tr><td>nombre</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>INDEX (FULLTEXT recomendado)</td><td>Nombre del producto</td></tr>
           <tr><td>descripcion</td><td>TEXT</td><td>Sí</td><td>NULL</td><td>—</td><td>Descripción larga</td></tr>
           <tr><td>codigo_interno</td><td>VARCHAR(60)</td><td>Sí</td><td>NULL</td><td>UNIQUE</td><td>Código propio del sistema</td></tr>
@@ -586,6 +586,8 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>precio_web</td><td>DECIMAL(12,2) UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Precio específico para web</td></tr>
           <tr><td>unidad_medida</td><td>ENUM('unidad','kg','lt','otro')</td><td>No</td><td>'unidad'</td><td>—</td><td>Si admite fracciones</td></tr>
           <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Disponible para venta</td></tr>
+          <tr><td>descuenta_stock_por_componentes</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>—</td><td>Solo aplica si <code>productos.tipo = 'combo'</code>. Si 1, vender el combo descuenta stock de cada componente individual</td></tr>
+          <tr><td>sincronizable_web</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>0</td><td>—</td><td>Si 0, esta variante NO se envía a WooCommerce (útil para componentes internos de combos)</td></tr>
           <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
           <tr><td>deleted_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Soft delete</td></tr>
         </table>
@@ -748,6 +750,7 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>precio_unitario</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>Precio histórico al momento de venta</td></tr>
           <tr><td>descuento_unitario</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>0.00</td><td>—</td><td>Descuento por unidad</td></tr>
           <tr><td>subtotal</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>(precio_unitario - descuento) * cantidad</td></tr>
+          <tr><td>promocion_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → promociones.id (SET NULL)</td><td>Promoción que se aplicó a esta línea (trazabilidad de descuentos promocionales)</td></tr>
         </table>
       </details>
 
@@ -832,6 +835,57 @@ class LocalLicenseStub implements LicenseValidator
         </table>
       </details>
 
+      <!-- 11.3 combo_componentes -->
+      <details>
+        <summary><strong>11.3 combo_componentes</strong> — Define los componentes individuales de un producto tipo combo</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>combo_variante_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → producto_variantes.id (CASCADE)</td><td>Variante del combo padre</td></tr>
+          <tr><td>componente_variante_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → producto_variantes.id (RESTRICT)</td><td>Variante del producto componente</td></tr>
+          <tr><td>cantidad</td><td>DECIMAL(12,3) UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>Cantidad del componente incluida en el combo</td></tr>
+          <tr><td>orden</td><td>TINYINT UNSIGNED</td><td>No</td><td>0</td><td>—</td><td>Orden de visualización en el POS</td></tr>
+        </table>
+      </details>
+
+      <!-- 11.4 promociones -->
+      <details>
+        <summary><strong>11.4 promociones</strong> — Cabecera de promociones comerciales</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>nombre</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>—</td><td>Nombre interno de la promoción</td></tr>
+          <tr><td>tipo</td><td>ENUM('descuento_porcentaje','descuento_monto_fijo','precio_fijo','nxm')</td><td>No</td><td>—</td><td>INDEX</td><td>Tipo de regla promocional</td></tr>
+          <tr><td>valor</td><td>DECIMAL(12,2) UNSIGNED</td><td>No</td><td>—</td><td>—</td><td>Porcentaje o monto según tipo</td></tr>
+          <tr><td>n_cantidad</td><td>TINYINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Para NxM: cantidad N</td></tr>
+          <tr><td>m_cantidad</td><td>TINYINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>—</td><td>Para NxM: cantidad M gratis</td></tr>
+          <tr><td>canal_aplicable</td><td>ENUM('pos','web','todos')</td><td>No</td><td>'todos'</td><td>—</td><td>Dónde aplica la promoción</td></tr>
+          <tr><td>fecha_inicio</td><td>DATETIME</td><td>No</td><td>—</td><td>INDEX</td><td>Inicio de vigencia</td></tr>
+          <tr><td>fecha_fin</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Fin de vigencia. NULL = sin expiración</td></tr>
+          <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Si 0 se desactiva manualmente</td></tr>
+          <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
+        </table>
+      </details>
+
+      <!-- 11.5 promocion_condiciones -->
+      <details>
+        <summary><strong>11.5 promocion_condiciones</strong> — Condiciones de aplicabilidad de cada promoción</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>promocion_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → promociones.id (CASCADE)</td><td>Promoción padre</td></tr>
+          <tr><td>producto_variante_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → producto_variantes.id (CASCADE)</td><td>Variante específica (NULL = aplica a cualquier producto que cumpla categoría)</td></tr>
+          <tr><td>categoria_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → categorias.id (CASCADE)</td><td>Categoría (NULL = no filtrada por categoría)</td></tr>
+          <tr><td>sucursal_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → sucursales.id (CASCADE)</td><td>Sucursal (NULL = todas las sucursales)</td></tr>
+          <tr><td>cantidad_minima</td><td>DECIMAL(12,3) UNSIGNED</td><td>No</td><td>1</td><td>—</td><td>Cantidad mínima del producto/categoría para activar la promoción</td></tr>
+          <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>NOTA:</strong> Si todos los FK son NULL, la promoción aplica a todo el carrito sin restricciones.</td></tr>
+        </table>
+      </details>
+
+      <div class="warn-box">
+        <strong>IMPORTANTE — Precedencia de promociones:</strong> Antes de programar la lógica de promociones, el equipo debe definir y documentar una regla de precedencia clara (ej. "la promoción de menor descuento gana", "solo una promoción por línea", "NxM se evalúa primero"). Sin esta regla, múltiples promociones aplicables a un mismo producto producirán resultados inconsistentes en <code>POST /ventas/preview</code> y en el cierre de venta final.
+      </div>
+
       <h3>12. Resumen de relaciones clave</h3>
       <ul>
         <li><code>usuarios.rol_id → roles.id</code></li>
@@ -843,6 +897,13 @@ class LocalLicenseStub implements LicenseValidator
         <li><code>stock_movimientos</code> referencia <code>sucursales</code>, <code>producto_variantes</code>, <code>tiendas</code>, <code>ventas</code></li>
         <li><code>ventas.cliente_id → clientes.id</code>, <code>ventas.tienda_id → tiendas.id</code>, <code>ventas.sucursal_id → sucursales.id</code></li>
         <li><code>venta_detalle.venta_id → ventas.id</code>, <code>venta_detalle.producto_variante_id → producto_variantes.id</code></li>
+        <li><code>venta_detalle.promocion_id → promociones.id</code> (SET NULL, trazabilidad de promociones)</li>
+        <li><code>combo_componentes.combo_variante_id → producto_variantes.id</code> (CASCADE)</li>
+        <li><code>combo_componentes.componente_variante_id → producto_variantes.id</code> (RESTRICT)</li>
+        <li><code>promocion_condiciones.promocion_id → promociones.id</code> (CASCADE)</li>
+        <li><code>promocion_condiciones.producto_variante_id → producto_variantes.id</code> (CASCADE, nullable)</li>
+        <li><code>promocion_condiciones.categoria_id → categorias.id</code> (CASCADE, nullable)</li>
+        <li><code>promocion_condiciones.sucursal_id → sucursales.id</code> (CASCADE, nullable)</li>
         <li><code>sync_eventos.tienda_id → tiendas.id</code></li>
       </ul>
 
@@ -2862,6 +2923,20 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <tr><td>POST</td><td><code>/api/webhooks/woo/{tienda_id}/producto-actualizado</code></td><td>Payload nativo Woo</td><td>Actualiza/Crea producto local según reglas de conflicto.</td></tr>
       </table>
 
+      <h3>4.2 Productos y Combos (Web — CRUD)</h3>
+      <p>CRUD estándar con vistas Inertia para productos y variantes. Los endpoints de componentes solo aplican si <code>productos.tipo = 'combo'</code>.</p>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/productos</code></td><td>busqueda, categoria_id, tipo (Query)</td><td>Renderiza listado de productos con filtros</td></tr>
+        <tr><td>POST</td><td><code>/productos</code></td><td>nombre, tipo, categoria_id, activo</td><td>Crea producto padre. Para <code>tipo=combo</code> crea automáticamente una variante default</td></tr>
+        <tr><td>PUT</td><td><code>/productos/{id}</code></td><td>Mismos campos</td><td>Actualiza producto padre</td></tr>
+        <tr><td>DELETE</td><td><code>/productos/{id}</code></td><td>—</td><td>Soft delete (bloqueado si hay movimiento de stock asociado)</td></tr>
+        <tr><td>GET</td><td><code>/productos/{id}/variantes</code></td><td>—</td><td>Renderiza listado de variantes del producto (vista Inertia con tabla Vue)</td></tr>
+        <tr><td>POST</td><td><code>/productos/{id}/variantes</code></td><td>sku, precio_base, activa, descuenta_stock_por_componentes, sincronizable_web</td><td>Crea variante. Para combos se deben registrar los componentes por separado</td></tr>
+        <tr><td>GET</td><td><code>/productos/{id}/componentes</code></td><td>—</td><td>Renderiza tabla de componentes del combo (solo si producto es <code>combo</code>)</td></tr>
+        <tr><td>POST</td><td><code>/productos/{id}/componentes</code></td><td>componente_variante_id, cantidad, orden</td><td>Agrega o actualiza componente del combo. Valida que el componente no sea el mismo combo ni forme un ciclo</td></tr>
+      </table>
+
       <h3>5. Catálogo y Stock (Web — CRUD)</h3>
       <p>Patrón idéntico a Usuarios y Sucursales (CRUD web clásico con vistas <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Inertia</a>). Operaciones clave de stock:</p>
       <table>
@@ -2879,6 +2954,7 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <tr><td>GET</td><td><code>/pos</code></td><td>—</td><td>Renderiza interfaz principal del POS. Productos iniciales como props.</td></tr>
         <tr><td>POST</td><td><code>/caja/abrir</code></td><td>monto_inicial</td><td>Abre sesión de caja del usuario actual.</td></tr>
         <tr><td>POST</td><td><code>/caja/cerrar</code></td><td>monto_final_declarado</td><td>Cierra sesión y calcula descuadres.</td></tr>
+        <tr><td>POST</td><td><code>/ventas/preview</code></td><td>items[] (carrito Pinia)</td><td>Evalúa promociones activas sobre el carrito sin persistir nada. Retorna JSON con subtotales, descuentos aplicados y total final. Idempotente.</td></tr>
         <tr><td>POST</td><td><code>/ventas</code></td><td>items[], pagos[]</td><td>Recibe carrito desde Pinia. Descuenta stock, registra pago, encola sync a WooCommerce. Retorna redirect con ID del comprobante.</td></tr>
         <tr><td>POST</td><td><code>/ventas/{id}/confirmar-despacho</code></td><td>sucursal_id</td><td>Pasa pedido web de <code>en_transito</code> a completada. Actualiza inventario físico.</td></tr>
       </table>
@@ -2916,6 +2992,16 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <tr><td>POST</td><td><code>/verificaciones</code></td><td>llave_instalacion</td><td>Chequeo periódico (cron). Retorna <code>{ estado: 'activo'|'suspendido' }</code>.</td></tr>
         <tr><td>GET</td><td><code>/instalaciones/{llave}</code></td><td>—</td><td>Consulta puntual para el panel de administración central.</td></tr>
         <tr><td>POST</td><td><code>/instalaciones/{llave}/suspender</code></td><td>motivo</td><td>Ruta administrativa interna del servicio central. Corta el servicio al POS cliente.</td></tr>
+      </table>
+
+      <h3>10. Promociones (Web — CRUD)</h3>
+      <p>CRUD web para administrar promociones y sus condiciones. La lógica de evaluación en tiempo real se ejecuta desde <code>POST /ventas/preview</code> y al confirmar la venta en <code>POST /ventas</code>.</p>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/promociones</code></td><td>activa, tipo, canal (Query)</td><td>Renderiza listado de promociones con filtros y estado (activa / vencida / programada)</td></tr>
+        <tr><td>POST</td><td><code>/promociones</code></td><td>nombre, tipo, valor, n_cantidad, m_cantidad, canal_aplicable, fecha_inicio, fecha_fin, activa</td><td>Crea promoción. Los campos <code>n_cantidad</code>/<code>m_cantidad</code> solo aplican si <code>tipo='nxm'</code></td></tr>
+        <tr><td>PUT</td><td><code>/promociones/{id}</code></td><td>Mismos campos</td><td>Actualiza promoción. Si ya hay ventas asociadas, la promoción original queda congelada en <code>venta_detalle.promocion_id</code></td></tr>
+        <tr><td>DELETE</td><td><code>/promociones/{id}</code></td><td>—</td><td>Soft delete. Las ventas existentes conservan la referencia (SET NULL en <code>venta_detalle</code>)</td></tr>
       </table>
     </article>
 
