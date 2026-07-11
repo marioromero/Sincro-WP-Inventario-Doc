@@ -102,7 +102,7 @@
         <tr><td>Inventario por Sucursal</td><td>Stock segregado por sucursal, transferencias entre branches, ajustes de inventario con razón, alerta de stock crítico.</td></tr>
         <tr><td>Sincronización WooCommerce</td><td>Publicación bidireccional de stock, creación/actualización de products desde el POS hacia WooCommerce, recepción de pedidos web.</td></tr>
         <tr><td>Gestión de Pedidos</td><td>Pedidos web importados desde WooCommerce, pedidos POS locales, rutas de despacho simples.</td></tr>
-        <tr><td>Roles y Users</td><td>Roles: Administrador, Supervisor, Vendedor, Bodeguero. Sesiones por sucursal.</td></tr>
+        <tr><td>Roles y Users</td><td>Roles: Cashier (Cajero), Supervisor, CentralAdmin (Admin Central). Sesiones por sucursal.</td></tr>
       </table>
 
       <h3>Fuera del alcance del MVP</h3>
@@ -931,6 +931,7 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>nombre</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Nombre de la marca</td></tr>
           <tr><td>descripcion</td><td>TEXT</td><td>Sí</td><td>NULL</td><td>—</td><td>Descripción breve de la marca</td></tr>
           <tr><td>logo_url</td><td>VARCHAR(500)</td><td>Sí</td><td>NULL</td><td>—</td><td>URL del logo o isotipo</td></tr>
+          <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
         </table>
       </details>
 
@@ -958,6 +959,7 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>nombre</td><td>VARCHAR(100)</td><td>No</td><td>—</td><td>—</td><td>Nombre visible (ej. "Caja 1", "Caja 2")</td></tr>
           <tr><td>codigo</td><td>VARCHAR(30)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Código corto único (ej. SUC01-CAJA1)</td></tr>
           <tr><td>activa</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Disponible para operar</td></tr>
+          <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
         </table>
       </details>
 
@@ -1975,7 +1977,7 @@ public function handle()
         <tr><th>Estado</th><th>Descripción</th><th>Visible al cliente en WC</th></tr>
         <tr><td>pending_assignment</td><td>Pedido web importado, esperando asignación a sucursal</td><td>Procesando</td></tr>
         <tr><td>assigned</td><td>Asignado a sucursal, pendiente de preparación</td><td>Procesando</td></tr>
-        <tr><td>preparing</td><td>Bodeguero está armando el pedido</td><td>Procesando</td></tr>
+        <tr><td>preparing</td><td>Staff está armando el pedido</td><td>Procesando</td></tr>
         <tr><td>ready_for_pickup</td><td>Listo para retiro en sucursal</td><td>Listo para retiro</td></tr>
         <tr><td>in_delivery</td><td>En ruta de despacho a domicilio</td><td>En camino</td></tr>
         <tr><td>delivered</td><td>Entregado al cliente</td><td>Completado</td></tr>
@@ -3085,6 +3087,24 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <tr><td>POST</td><td><code>/sales</code></td><td>items[], pagos[]</td><td>Recibe carrito desde Pinia. Descuenta stock, registra pago, encola sync a WooCommerce. Retorna redirect con ID del comprobante. <strong>Regla de negocio (stock cero/negativo):</strong> Si el stock disponible llega a 0, el POS físico muestra una advertencia visual pero permite al cajero forzar la venta (el producto está físicamente en mano). Para pedidos web entrantes, WooCommerce bloquea la venta automáticamente con su lógica nativa de stock; el sistema respeta esa decisión y no sobreescribe el stock en negativo desde la web.</td></tr>
         <tr><td>POST</td><td><code>/sales/{id}/confirmar-despacho</code></td><td>branch_id</td><td>Pasa pedido web de <code>en_transito</code> a completada. Actualiza inventario físico.</td></tr>
       </table>
+
+      <h3>Especificación del comprobante interno (ticket POS)</h3>
+      <p>Al finalizar una venta POS exitosa, el sistema imprime (o genera PDF de) un comprobante interno con los siguientes campos obligatorios:</p>
+      <table>
+        <tr><th>Campo</th><th>Descripción</th></tr>
+        <tr><td>Logo</td><td>Logo del comercio configurado por branch (campo <code>logo_url</code> en tabla <code>branches</code>, opcional)</td></tr>
+        <tr><td>Nombre de Sucursal</td><td>Nombre de la branch donde se realizó la venta</td></tr>
+        <tr><td>RUT del comercio</td><td>RUT asociado a la branch o al comercio (configurable desde el panel Admin)</td></tr>
+        <tr><td>Nombre del Cashier</td><td>Nombre del usuario que abrió la sesión de caja y registró la venta</td></tr>
+        <tr><td>Detalle de ítems</td><td>Lista de productos: nombre, cantidad, precio unitario, subtotal por línea</td></tr>
+        <tr><td>Totales</td><td>Subtotal, descuentos aplicados (con nombre de la promoción si aplica), total final</td></tr>
+        <tr><td>Medios de Pago</td><td>Desglose de montos por medio de pago utilizado (efectivo, tarjeta, transferencia, etc.)</td></tr>
+        <tr><td>Número correlativo interno</td><td>Identificador único secuencial por branch (no necesariamente el ID de la venta)</td></tr>
+        <tr><td>Leyenda legal</td><td><strong>"Este documento no es válido como boleta fiscal"</strong> — texto obligatorio en posición visible</td></tr>
+      </table>
+      <div class="warn-box">
+        <strong>Importante:</strong> Este comprobante es interno del sistema y no reemplaza la boleta electrónica o factura emitida por un proveedor SII autorizado. La integración con facturación electrónica (DTE) está fuera del alcance del MVP (ver <a href="#" data-page="vision-general-alcance-mvp" onclick="location.hash='vision-general-alcance-mvp';return false;">sección 1.3</a>).
+      </div>
 
       <h3>7. Clientes (Web — CRUD + Privacidad)</h3>
       <table>
