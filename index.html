@@ -570,6 +570,7 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>codigo_interno</td><td>VARCHAR(60)</td><td>Sí</td><td>NULL</td><td>UNIQUE</td><td>Código propio del sistema</td></tr>
           <tr><td>activo</td><td>TINYINT(1) UNSIGNED</td><td>No</td><td>1</td><td>INDEX</td><td>Disponible para venta</td></tr>
           <tr><td>origen_creacion</td><td>ENUM('pos','woo')</td><td>No</td><td>'pos'</td><td>—</td><td>Dónde se creó originalmente</td></tr>
+          <tr><td>marca_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>FK → marcas.id (SET NULL)</td><td>Marca del producto (opcional)</td></tr>
           <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
           <tr><td>deleted_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Soft delete</td></tr>
         </table>
@@ -882,6 +883,68 @@ class LocalLicenseStub implements LicenseValidator
         </table>
       </details>
 
+      <!-- 4.9 etiquetas -->
+      <details>
+        <summary><strong>4.9 etiquetas</strong> — Etiquetas (tags) para categorización flexible de productos</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>nombre</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>—</td><td>Nombre visible de la etiqueta</td></tr>
+          <tr><td>slug</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Slug único para sincronización con WooCommerce</td></tr>
+        </table>
+      </details>
+
+      <!-- 4.10 producto_etiqueta -->
+      <details>
+        <summary><strong>4.10 producto_etiqueta</strong> — Pivote N:M entre productos y etiquetas</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>producto_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → productos.id (CASCADE)</td><td>Producto padre</td></tr>
+          <tr><td>etiqueta_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → etiquetas.id (CASCADE)</td><td>Etiqueta asignada</td></tr>
+          <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>PK COMPUESTA</strong> (producto_id, etiqueta_id)</td></tr>
+        </table>
+      </details>
+
+      <!-- 4.11 etiqueta_tienda_mapeo -->
+      <details>
+        <summary><strong>4.11 etiqueta_tienda_mapeo</strong> — Mapeo de etiqueta local a tag de WooCommerce por tienda</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>etiqueta_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → etiquetas.id (CASCADE)</td><td>Etiqueta local</td></tr>
+          <tr><td>tienda_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → tiendas.id (CASCADE)</td><td>Tienda WooCommerce</td></tr>
+          <tr><td>woo_tag_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>INDEX</td><td>ID del tag en WooCommerce (NULL si aún no se sincronizó)</td></tr>
+          <tr><td>ultima_sync_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Última sincronización exitosa</td></tr>
+          <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (etiqueta_id, tienda_id)</td></tr>
+        </table>
+      </details>
+
+      <!-- 4.12 marcas -->
+      <details>
+        <summary><strong>4.12 marcas</strong> — Marcas de productos</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>nombre</td><td>VARCHAR(255)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Nombre de la marca</td></tr>
+          <tr><td>descripcion</td><td>TEXT</td><td>Sí</td><td>NULL</td><td>—</td><td>Descripción breve de la marca</td></tr>
+          <tr><td>logo_url</td><td>VARCHAR(500)</td><td>Sí</td><td>NULL</td><td>—</td><td>URL del logo o isotipo</td></tr>
+        </table>
+      </details>
+
+      <!-- 4.13 marca_tienda_mapeo -->
+      <details>
+        <summary><strong>4.13 marca_tienda_mapeo</strong> — Mapeo de marca local a brand de WooCommerce por tienda</summary>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
+          <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
+          <tr><td>marca_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → marcas.id (CASCADE)</td><td>Marca local</td></tr>
+          <tr><td>tienda_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → tiendas.id (CASCADE)</td><td>Tienda WooCommerce</td></tr>
+          <tr><td>woo_brand_id</td><td>BIGINT UNSIGNED</td><td>Sí</td><td>NULL</td><td>INDEX</td><td>ID del brand en WooCommerce (NULL si aún no se sincronizó)</td></tr>
+          <tr><td>ultima_sync_at</td><td>DATETIME</td><td>Sí</td><td>NULL</td><td>—</td><td>Última sincronización exitosa</td></tr>
+          <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (marca_id, tienda_id)</td></tr>
+        </table>
+      </details>
+
       <div class="warn-box">
         <strong>IMPORTANTE — Precedencia de promociones:</strong> Antes de programar la lógica de promociones, el equipo debe definir y documentar una regla de precedencia clara (ej. "la promoción de menor descuento gana", "solo una promoción por línea", "NxM se evalúa primero"). Sin esta regla, múltiples promociones aplicables a un mismo producto producirán resultados inconsistentes en <code>POST /ventas/preview</code> y en el cierre de venta final.
       </div>
@@ -893,7 +956,11 @@ class LocalLicenseStub implements LicenseValidator
         <li><code>productos.categoria_id → categorias.id</code></li>
         <li><code>producto_variantes.producto_id → productos.id</code></li>
         <li><code>producto_variantes ↔ valores_atributo</code> vía <code>producto_variante_valores</code> (N:M)</li>
+        <li><code>productos.marca_id → marcas.id</code> (SET NULL)</li>
+        <li><code>productos ↔ etiquetas</code> vía <code>producto_etiqueta</code> (N:M)</li>
         <li><code>producto_tienda_mapeo</code> conecta <code>producto_variantes</code> con <code>tiendas</code> (N:M con datos)</li>
+        <li><code>etiqueta_tienda_mapeo</code> conecta <code>etiquetas</code> con <code>tiendas</code> (N:M con datos)</li>
+        <li><code>marca_tienda_mapeo</code> conecta <code>marcas</code> con <code>tiendas</code> (N:M con datos)</li>
         <li><code>stock_movimientos</code> referencia <code>sucursales</code>, <code>producto_variantes</code>, <code>tiendas</code>, <code>ventas</code></li>
         <li><code>ventas.cliente_id → clientes.id</code>, <code>ventas.tienda_id → tiendas.id</code>, <code>ventas.sucursal_id → sucursales.id</code></li>
         <li><code>venta_detalle.venta_id → ventas.id</code>, <code>venta_detalle.producto_variante_id → producto_variantes.id</code></li>
@@ -2910,7 +2977,7 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <tr><td>GET</td><td><code>/tiendas</code></td><td>—</td><td>Renderiza panel de integraciones WooCommerce.</td></tr>
         <tr><td>POST</td><td><code>/tiendas</code></td><td>url_base, consumer_key, consumer_secret, webhook_secret</td><td>Guarda tienda con credenciales cifradas.</td></tr>
         <tr><td>PUT</td><td><code>/tiendas/{id}</code></td><td>Mismos campos</td><td>Actualiza configuración de tienda.</td></tr>
-        <tr><td>POST</td><td><code>/tiendas/{id}/probar-conexion</code></td><td>—</td><td>HTTP request a WooCommerce desde el controlador. Retorna <code>back()->with('status', 'OK')</code>.</td></tr>
+        <tr><td>POST</td><td><code>/tiendas/{id}/probar-conexion</code></td><td>—</td><td>HTTP request a WooCommerce desde el controlador. Retorna <code>back()->with('status', 'OK')</code>. <strong>Regla de negocio:</strong> debe verificar si el endpoint <code>/products/brands</code> existe en la API de Woo del cliente. Si da error 404 (versión antigua sin marcas), se debe deshabilitar la sincronización de marcas automáticamente para esa tienda sin bloquear la conexión general.</td></tr>
         <tr><td>POST</td><td><code>/tiendas/{id}/sincronizar</code></td><td>entidad</td><td>Dispara Job de sincronización manual (catálogo/stock).</td></tr>
       </table>
 
@@ -2935,6 +3002,22 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <tr><td>POST</td><td><code>/productos/{id}/variantes</code></td><td>sku, precio_base, activa, descuenta_stock_por_componentes, sincronizable_web</td><td>Crea variante. Para combos se deben registrar los componentes por separado</td></tr>
         <tr><td>GET</td><td><code>/productos/{id}/componentes</code></td><td>—</td><td>Renderiza tabla de componentes del combo (solo si producto es <code>combo</code>)</td></tr>
         <tr><td>POST</td><td><code>/productos/{id}/componentes</code></td><td>componente_variante_id, cantidad, orden</td><td>Agrega o actualiza componente del combo. Valida que el componente no sea el mismo combo ni forme un ciclo</td></tr>
+      </table>
+
+      <h3>4.3 Etiquetas y Marcas (Web — CRUD)</h3>
+      <p>CRUD web para administrar etiquetas y marcas. Ambos se sincronizan con WooCommerce a través de sus tablas de mapeo respectivas (<code>etiqueta_tienda_mapeo</code>, <code>marca_tienda_mapeo</code>).</p>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/etiquetas</code></td><td>busqueda (Query)</td><td>Renderiza listado de etiquetas</td></tr>
+        <tr><td>POST</td><td><code>/etiquetas</code></td><td>nombre, slug</td><td>Crea etiqueta. El slug se genera automáticamente si no se envía</td></tr>
+        <tr><td>PUT</td><td><code>/etiquetas/{id}</code></td><td>nombre, slug</td><td>Actualiza etiqueta. Re-sincroniza con WooCommerce si ya tiene mapeos</td></tr>
+        <tr><td>DELETE</td><td><code>/etiquetas/{id}</code></td><td>—</td><td>Soft delete. Los mapeos WooCommerce se conservan para trazabilidad</td></tr>
+        <tr><td>POST</td><td><code>/etiquetas/{id}/mapeos</code></td><td>tienda_id, woo_tag_id (opcional)</td><td>Vincula manualmente la etiqueta local con un tag existente en WooCommerce. Si se omite <code>woo_tag_id</code>, el sistema crea el tag automáticamente y registra el ID</td></tr>
+        <tr><td>GET</td><td><code>/marcas</code></td><td>busqueda (Query)</td><td>Renderiza listado de marcas</td></tr>
+        <tr><td>POST</td><td><code>/marcas</code></td><td>nombre, descripcion, logo_url</td><td>Crea marca</td></tr>
+        <tr><td>PUT</td><td><code>/marcas/{id}</code></td><td>nombre, descripcion, logo_url</td><td>Actualiza marca. Re-sincroniza con WooCommerce si tiene mapeos</td></tr>
+        <tr><td>DELETE</td><td><code>/marcas/{id}</code></td><td>—</td><td>Soft delete. Los mapeos WooCommerce se conservan</td></tr>
+        <tr><td>POST</td><td><code>/marcas/{id}/mapeos</code></td><td>tienda_id, woo_brand_id (opcional)</td><td>Vincula manualmente la marca local con un brand de WooCommerce. Si se omite <code>woo_brand_id</code>, el sistema crea el brand automáticamente. Si <code>/products/brands</code> no existe en la tienda (WooCommerce antiguo), retorna error 400 y deshabilita la sincronización de marcas para esa tienda</td></tr>
       </table>
 
       <h3>5. Catálogo y Stock (Web — CRUD)</h3>
