@@ -5,6 +5,12 @@
   // Each section: { id, number, title, subs: [{ id, title }] }
   const sections = [
     {
+      id: 'glosario', number: '00', title: 'Glosario y Convenciones',
+      subs: [
+        { id: 'convenciones', title: 'Glosario y Convenciones del Sistema' }
+      ]
+    },
+    {
       id: 'vision-general', number: '01', title: 'Visión General del Producto',
       subs: [
         { id: 'contexto', title: 'Contexto del Producto' },
@@ -53,42 +59,47 @@
       ]
     },
     {
-      id: 'preguntas', number: '07', title: 'Preguntas Abiertas',
-      subs: [
-        { id: 'webpay-fisico', title: 'Webpay Físico' },
-        { id: 'facturacion-dte', title: 'Facturación DTE' }
-      ]
-    },
-    {
-      id: 'interna', number: '08', title: 'Estructura y Operación Interna',
+      id: 'interna', number: '07', title: 'Estructura y Operación Interna',
       subs: [
         { id: 'directorios', title: 'Core Backend: Directorios' },
         { id: 'reporteria', title: 'Reportería y Rendimiento' }
       ]
     },
     {
-      id: 'frontera', number: '09', title: 'Frontera del MVP y Backlog Fase 2',
+      id: 'frontera', number: '08', title: 'Frontera del MVP y Backlog Fase 2',
       subs: [
         { id: 'limites', title: 'Límites y Exclusiones del MVP' }
       ]
     },
     {
-      id: 'frontend-guide', number: '10', title: 'Guía de Frontend',
+      id: 'frontend-guide', number: '09', title: 'Guía de Frontend',
       subs: [
         { id: 'vue', title: 'Vue 3 + Inertia' }
       ]
     },
     {
-      id: 'backend-guide', number: '11', title: 'Guía de Backend',
+      id: 'backend-guide', number: '10', title: 'Guía de Backend',
       subs: [
         { id: 'queues', title: 'Motor de Colas y Cron' },
         { id: 'servicios', title: 'Servicios Transversales' },
-        { id: 'middleware', title: 'Middleware y Seguridad en Rutas' },
-        { id: 'rutas', title: 'Mapa de Rutas del Sistema' }
+        { id: 'middleware', title: 'Middleware y Seguridad en Rutas' }
       ]
     },
     {
-      id: 'hoja-ruta', number: '12', title: 'Hoja de Ruta (Paso a Paso)',
+      id: 'backend-guide', number: '11', title: 'Mapa de Rutas del Sistema',
+      subs: [
+        { id: 'rutas', title: 'Especificación de Rutas' }
+      ]
+    },
+    {
+      id: 'preguntas', number: '12', title: 'Preguntas Abiertas y Fase 2',
+      subs: [
+        { id: 'webpay-fisico', title: 'Webpay Físico' },
+        { id: 'facturacion-dte', title: 'Facturación DTE' }
+      ]
+    },
+    {
+      id: 'hoja-ruta', number: '13', title: 'Hoja de Ruta (Paso a Paso)',
       subs: [
         { id: 'pasos', title: 'Secuencia de Construcción' }
       ]
@@ -135,8 +146,6 @@
     const activeLink = nav.querySelector(`a[data-page="${pageId}"]`);
     if (activeLink) activeLink.classList.add('active');
     // Open parent section
-    const sectionId = pageId.split('-').slice(0, -1).join('-');
-    // Handle multi-word section IDs properly
     let parentSec = null;
     sections.forEach(s => {
       if (pageId.startsWith(s.id + '-')) parentSec = s.id;
@@ -175,7 +184,7 @@
       showPage(hash);
     } else {
       // Default: show first page of first section
-      const firstId = sections[0].id + '-' + sections[0].subs[0].id;
+      const firstId = 'glosario-convenciones';
       showPage(firstId);
     }
   }

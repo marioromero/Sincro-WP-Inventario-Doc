@@ -25,6 +25,57 @@
   <main class="content" id="main-content">
 
     <!-- ================================================================ -->
+    <!--  SECCIÓN 0: GLOSARIO Y CONVENCIONES                              -->
+    <!-- ================================================================ -->
+
+    <article class="page" id="glosario-convenciones">
+      <div class="section-id">00 · Glosario y Convenciones</div>
+      <h2>Glosario y Convenciones del Sistema</h2>
+      <p class="lead">Equivalencias de nomenclatura y reglas de estilo del código fuente. Léase antes de programar.</p>
+
+      <h3>Nomenclatura Laravel (inglés)</h3>
+      <p>El sistema sigue las convenciones nativas de Laravel: los nombres de tabla van en <strong>inglés plural</strong> (snake_case) y los modelos en <strong>inglés singular</strong> (PascalCase).</p>
+      <table>
+        <tr><th>Concepto de negocio</th><th>Tabla (plural)</th><th>Modelo (singular)</th></tr>
+        <tr><td>Sucursal física</td><td><code>branches</code></td><td><code>Branch</code></td></tr>
+        <tr><td>Tienda WooCommerce</td><td><code>stores</code></td><td><code>Store</code></td></tr>
+        <tr><td>Usuario del sistema</td><td><code>users</code></td><td><code>User</code></td></tr>
+        <tr><td>Rol de usuario</td><td><code>roles</code></td><td><code>Role</code></td></tr>
+        <tr><td>Categoría de producto</td><td><code>categories</code></td><td><code>Category</code></td></tr>
+        <tr><td>Producto</td><td><code>products</code></td><td><code>Product</code></td></tr>
+        <tr><td>Variante de producto (talla/color)</td><td><code>product_variants</code></td><td><code>ProductVariant</code></td></tr>
+        <tr><td>Valor de atributo</td><td><code>attribute_values</code></td><td><code>AttributeValue</code></td></tr>
+        <tr><td>Movimiento de stock</td><td><code>stock_movements</code></td><td><code>StockMovement</code></td></tr>
+        <tr><td>Stock actual</td><td><code>current_stock</code></td><td><code>CurrentStock</code></td></tr>
+        <tr><td>Venta</td><td><code>sales</code></td><td><code>Sale</code></td></tr>
+        <tr><td>Ítem de venta</td><td><code>sale_items</code></td><td><code>SaleItem</code></td></tr>
+        <tr><td>Pago de venta</td><td><code>sale_payments</code></td><td><code>SalePayment</code></td></tr>
+        <tr><td>Cliente</td><td><code>customers</code></td><td><code>Customer</code></td></tr>
+        <tr><td>Promoción</td><td><code>promotions</code></td><td><code>Promotion</code></td></tr>
+        <tr><td>Etiqueta / Tag</td><td><code>tags</code></td><td><code>Tag</code></td></tr>
+        <tr><td>Marca</td><td><code>brands</code></td><td><code>Brand</code></td></tr>
+        <tr><td>Estación POS</td><td><code>pos_stations</code></td><td><code>PosStation</code></td></tr>
+        <tr><td>Sesión de caja</td><td><code>cash_sessions</code></td><td><code>CashSession</code></td></tr>
+        <tr><td>Combo (producto compuesto)</td><td><code>combo_components</code></td><td><code>ComboComponent</code></td></tr>
+      </table>
+
+      <h3>Convenciones de código</h3>
+      <table>
+        <tr><th>Regla</th><th>Valor</th></tr>
+        <tr><td>Motor BD</td><td>InnoDB estricto, RESTRICT en lugar de CASCADE salvo excepciones documentadas</td></tr>
+        <tr><td>Borrado</td><td>Prohibido borrado físico (Soft Deletes con <code>deleted_at</code>)</td></tr>
+        <tr><td>Cifrado app-level</td><td>Campos sensibles (RUT, email, credenciales API) cifrados con <code>Crypt::encrypt()</code> / <code>Crypt::decrypt()</code> de Laravel</td></tr>
+        <tr><td>Charset</td><td><code>utf8mb4</code> / <code>utf8mb4_unicode_ci</code></td></tr>
+        <tr><td>Timestamps</td><td><code>created_at</code> / <code>updated_at</code> gestionados por Laravel</td></tr>
+        <tr><td>Booleanos</td><td><code>TINYINT(1) UNSIGNED</code></td></tr>
+        <tr><td>Dinero</td><td><code>DECIMAL(12,2)</code></td></tr>
+        <tr><td>Stock</td><td><code>DECIMAL(12,3)</code></td></tr>
+        <tr><td>Roles</td><td>Cashier (Cajero), Supervisor, CentralAdmin (Admin Central) — acumulativos</td></tr>
+        <tr><td>Resolución conflictos sync</td><td>Field Ownership: POS dueño de price y stock; WooCommerce dueño de description e images</td></tr>
+      </table>
+    </article>
+
+    <!-- ================================================================ -->
     <!--  SECCIÓN 1: VISIÓN GENERAL DEL PRODUCTO                          -->
     <!-- ================================================================ -->
 
@@ -840,9 +891,9 @@ class LocalLicenseStub implements LicenseValidator
         </table>
       </details>
 
-      <!-- 11.3 combo_components -->
+      <!-- 4.9 combo_components -->
       <details>
-        <summary><strong>11.3 combo_components</strong> — Define los componentes individuales de un producto tipo combo</summary>
+        <summary><strong>4.9 combo_components</strong> — Define los componentes individuales de un producto tipo combo</summary>
         <table>
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
@@ -853,9 +904,9 @@ class LocalLicenseStub implements LicenseValidator
         </table>
       </details>
 
-      <!-- 11.4 promotions -->
+      <!-- 4.10 promotions -->
       <details>
-        <summary><strong>11.4 promotions</strong> — Cabecera de promotions comerciales</summary>
+        <summary><strong>4.10 promotions</strong> — Cabecera de promotions comerciales</summary>
         <table>
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
@@ -872,9 +923,9 @@ class LocalLicenseStub implements LicenseValidator
         </table>
       </details>
 
-      <!-- 11.5 promotion_conditions -->
+      <!-- 4.11 promotion_conditions -->
       <details>
-        <summary><strong>11.5 promotion_conditions</strong> — Condiciones de aplicabilidad de cada promoción</summary>
+        <summary><strong>4.11 promotion_conditions</strong> — Condiciones de aplicabilidad de cada promoción</summary>
         <table>
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
@@ -887,9 +938,9 @@ class LocalLicenseStub implements LicenseValidator
         </table>
       </details>
 
-      <!-- 4.9 tags -->
+      <!-- 4.12 tags -->
       <details>
-        <summary><strong>4.9 tags</strong> — Etiquetas (tags) para categorización flexible de products</summary>
+        <summary><strong>4.12 tags</strong> — Etiquetas (tags) para categorización flexible de products</summary>
         <table>
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
@@ -897,10 +948,10 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>slug</td><td>VARCHAR(150)</td><td>No</td><td>—</td><td>UNIQUE</td><td>Slug único para sincronización con WooCommerce</td></tr>
         </table>
       </details>
+      <!-- 4.13 product_tag -->
 
-      <!-- 4.10 product_tag -->
       <details>
-        <summary><strong>4.10 product_tag</strong> — Pivote N:M entre products y tags</summary>
+        <summary><strong>4.13 product_tag</strong> — Pivote N:M entre products y tags</summary>
         <table>
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>product_id</td><td>BIGINT UNSIGNED</td><td>No</td><td>—</td><td>FK → products.id (CASCADE)</td><td>Producto padre</td></tr>
@@ -908,10 +959,10 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>PK COMPUESTA</strong> (product_id, etiqueta_id)</td></tr>
         </table>
       </details>
+      <!-- 4.14 tag_store_mappings -->
 
-      <!-- 4.11 tag_store_mappings -->
       <details>
-        <summary><strong>4.11 tag_store_mappings</strong> — Mapeo de etiqueta local a tag de WooCommerce por tienda</summary>
+        <summary><strong>4.14 tag_store_mappings</strong> — Mapeo de etiqueta local a tag de WooCommerce por tienda</summary>
         <table>
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
@@ -922,10 +973,10 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td colspan="6" style="font-size:0.8rem;color:#666;"><strong>UNIQUE</strong> (etiqueta_id, store_id)</td></tr>
         </table>
       </details>
+      <!-- 4.15 brands -->
 
-      <!-- 4.12 brands -->
       <details>
-        <summary><strong>4.12 brands</strong> — Marcas de products</summary>
+        <summary><strong>4.15 brands</strong> — Marcas de products</summary>
         <table>
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
@@ -935,10 +986,10 @@ class LocalLicenseStub implements LicenseValidator
           <tr><td>created_at / updated_at</td><td>DATETIME</td><td>No</td><td>—</td><td>—</td><td>Timestamps</td></tr>
         </table>
       </details>
+      <!-- 4.16 brand_store_mappings -->
 
-      <!-- 4.13 brand_store_mappings -->
       <details>
-        <summary><strong>4.13 brand_store_mappings</strong> — Mapeo de marca local a brand de WooCommerce por tienda</summary>
+        <summary><strong>4.16 brand_store_mappings</strong> — Mapeo de marca local a brand de WooCommerce por tienda</summary>
         <table>
           <tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Default</th><th>Clave/Índice</th><th>Descripción</th></tr>
           <tr><td>id</td><td>BIGINT UNSIGNED</td><td>No</td><td>AUTO_INCREMENT</td><td>PK</td><td>Identificador interno</td></tr>
@@ -2175,78 +2226,12 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
     </article>
 
     <!-- ================================================================ -->
-    <!--  SECCIÓN 7: PREGUNTAS ABIERTAS                                   -->
+    <!--  SECCIÓN 7: ESTRUCTURA Y OPERACIÓN INTERNA                       -->
     <!-- ================================================================ -->
 
-    <article class="page" id="preguntas-webpay-fisico">
-      <div class="section-id">07 · Preguntas Abiertas</div>
-      <h2>Webpay Físico</h2>
-      <p class="lead">La integración con Webpay Plus Presencial (terminal POS físico de Transbank) queda fuera del MVP pero es la funcionalidad más solicitada por los customers.</p>
-
-      <h3>¿Qué implica?</h3>
-      <p>Webpay Plus Presencial requiere un terminal POS físico conectado por puerto serie o Bluetooth a un computador con el sistema POS. Transbank provee un SDK (generalmente DLL en Windows o JAR en Java) que debe ser llamado desde el sistema para iniciar la transacción.</p>
-
-      <h3>Desafíos técnicos</h3>
-      <ul>
-        <li><strong>Compatibilidad con Laravel (PHP):</strong> El SDK de Transbank es para Java/.NET. Habría que crear un bridge (ej. microservicio en Node.js o contenedor Java) que se comunique con Laravel vía socket local o API HTTP.</li>
-        <li><strong>Certificación:</strong> Transbank exige certificación para cada integración. El proceso puede tomar 2-4 semanas.</li>
-        <li><strong>Multi-plataforma:</strong> El POS corre en navegador (cualquier SO), pero el bridge con el terminal POS es dependiente del SO del operador.</li>
-        <li><strong>Sin demonios en <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a>:</strong> El bridge sería un proceso externo que debe ejecutarse en la máquina del operador, no en el servidor.</li>
-      </ul>
-
-      <h3>Arquitectura propuesta (futura)</h3>
-      <pre>┌─────────────┐    WebSocket     ┌──────────────┐    Puerto Serie    ┌──────────┐
-│  Laravel POS │◄──────────────►│  Bridge POS   │◄────────────────►│ Terminal  │
-│  (Navegador) │    localhost    │  (Node.js)    │    / Bluetooth    │ Transbank │
-└─────────────┘    :6001        └──────────────┘                   └──────────┘</pre>
-
-      <div class="warn-box">
-        <strong>Decisión pendiente:</strong> Evaluar si se usa la nueva API REST de Transbank (Webpay API 2.0) que permite integración sin SDK propietario, mediante QR dinámico y pago desde el teléfono del cliente, eliminando la necesidad del bridge local.
-      </div>
-    </article>
-
-    <article class="page" id="preguntas-facturacion-dte">
-      <div class="section-id">07 · Preguntas Abiertas</div>
-      <h2>Facturación DTE</h2>
-      <p class="lead">La facturación electrónica chilena (DTE) es obligatoria para la mayoría de los comercios. Su implementación requiere integración con el SII o un proveedor autorizado.</p>
-
-      <h3>Contexto legal</h3>
-      <p>Chile exige emisión de Documentos Tributarios Electrónicos (DTE) desde 2018 para la mayoría de los contribuyentes. Los tipos de documento relevantes son:</p>
-      <ul>
-        <li><strong>Boleta Electrónica:</strong> Para consumidores finales (sin RUT).</li>
-        <li><strong>Factura Electrónica:</strong> Para empresas (con RUT).</li>
-        <li><strong>Nota de Crédito/Débito:</strong> Para correcciones.</li>
-      </ul>
-
-      <h3>Opciones de integración</h3>
-      <table>
-        <tr><th>Proveedor</th><th>Tipo</th><th>Ventajas</th><th>Desventajas</th></tr>
-        <tr><td>SII Directo (libre)</td><td>API SOAP</td><td>Sin costo por transacción</td><td>Integración compleja, requiere firma electrónica, certificación SII</td></tr>
-        <tr><td>PayMe</td><td>API REST</td><td>SDK moderno, soporte local, precios competitivos</td><td>Costo mensual + por documento</td></tr>
-        <tr><td>Efact</td><td>API REST</td><td>Amplia adopción en Chile, buen soporte</td><td>Costo más alto</td></tr>
-        <tr><td>SimpleFact</td><td>API REST</td><td>Económico, API moderna</td><td>Menos trayectoria</td></tr>
-      </table>
-
-      <h3>Preguntas abiertas para decisión</h3>
-      <ul>
-        <li><strong>¿Se factura desde el POS o desde WooCommerce?</strong> Opción A: El POS emite la boleta/factura al momento de la venta presencial. Opción B: WooCommerce emite los DTE de pedidos web. Lo ideal sería ambos, pero duplica la integración.</li>
-        <li><strong>¿Timing de emisión?</strong> Inmediata (al pagar) vs. diferida (al despachar). La ley permite ambas, pero la inmediata es mejor para el cliente.</li>
-        <li><strong>¿Múltiples <a href="#" data-page="inventario-branches" onclick="location.hash='inventario-branches';return false;">branches</a> con un solo RUT?</strong> Si el cliente tiene un RUT para todas las branches, los DTE se emiten con ese RUT pero deben identificar la sucursal emisora en el detalle.</li>
-        <li><strong>¿RUT de cliente obligatorio?</strong> Para boletas no es obligatorio; para facturas sí. El POS debe manejar ambos flujos.</li>
-      </ul>
-
-      <div class="warn-box">
-        <strong>Decisión pendiente:</strong> Se recomienda integrar con un proveedor tipo PayMe para la Fase 2, ya que reduce drásticamente el tiempo de implementación comparado con la integración directa al SII. El costo por transacción se traslada al cliente como costo operacional.
-      </div>
-    </article>
-
-    <!-- ================================================================ -->
-    <!--  SECCIÓN 8: ESTRUCTURA Y OPERACIÓN INTERNA                       -->
-    <!-- ================================================================ -->
-
-    <!-- 8.1 Core Backend: Estructura de Directorios -->
+    <!-- 7.1 Core Backend: Estructura de Directorios -->
     <article class="page" id="interna-directorios">
-      <div class="section-id">08 · Estructura y Operación Interna</div>
+      <div class="section-id">07 · Estructura y Operación Interna</div>
       <h2>Core Backend: Estructura de Directorios</h2>
       <p class="lead">El proyecto rechaza la estructura MVC plana de Laravel (<code>app/Models</code>, <code>app/Http/Controllers</code>) en favor de una organización por dominios (DDD ligero). Esto aísla la lógica de negocio para un desarrollador que trabaja solo y facilita migraciones futuras.</p>
 
@@ -2365,9 +2350,9 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
       </blockquote>
     </article>
 
-    <!-- 8.2 Reportería y Rendimiento -->
+    <!-- 7.2 Reportería y Rendimiento -->
     <article class="page" id="interna-reporteria">
-      <div class="section-id">08 · Estructura y Operación Interna</div>
+      <div class="section-id">07 · Estructura y Operación Interna</div>
       <h2>Reportería y Rendimiento</h2>
       <p class="lead">Regla de oro: prohibido calcular reportes en tiempo real sobre tablas transaccionales. El rendimiento del POS es la prioridad máxima; la latencia en reportes es una decisión de diseño aceptada.</p>
 
@@ -2464,11 +2449,11 @@ public function handle(): void
     </article>
 
     <!-- ================================================================ -->
-    <!--  SECCIÓN 9: FRONTERA DEL MVP Y BACKLOG                           -->
+    <!--  SECCIÓN 8: FRONTERA DEL MVP Y BACKLOG                           -->
     <!-- ================================================================ -->
 
     <article class="page" id="frontera-limites">
-      <div class="section-id">09 · Frontera del MVP y Backlog Fase 2</div>
+      <div class="section-id">08 · Frontera del MVP y Backlog Fase 2</div>
       <h2>Límites y Exclusiones del MVP</h2>
       <p class="lead">Esta página define explícitamente qué funcionalidades están fuera del alcance de la primera versión entregable (MVP) y documenta su alcance conceptual para el desarrollo futuro. Ninguna de estas funcionalidades debe implementarse en la fase MVP.</p>
 
@@ -2543,6 +2528,16 @@ public function handle(): void
       <p><strong>Por qué no está en el MVP:</strong> Cada courier tiene su propia API de tracking con distintos formatos y requerimientos de autenticación. La integración es puramente operativa y no afecta la transaccionalidad del negocio.</p>
       <p><strong>Alcance conceptual para Fase 2:</strong> Tabla <code>shipping_providers</code> con configuración de API por courier. <a href="#" data-page="sincronizacion-webhooks" onclick="location.hash='sincronizacion-webhooks';return false;">Webhook</a> receptor para actualizar estado automáticamente cuando el courier escanea el paquete.</p>
 
+      <h3>6. Gestión de Proveedores y Órdenes de Compra</h3>
+      <p><strong>Situación en el MVP:</strong> No existe gestión de proveedores ni órdenes de compra. Las entradas de inventario se registran como <strong>ajustes manuales</strong> (tipo <code>ajuste</code> en <code>stock_movements</code>) con razón obligatoria. No hay flujo de recepción de mercadería, orden de compra vs nota de entrada, ni gestión de deuda con proveedores.</p>
+      <p><strong>Por qué no está en el MVP:</strong> El sistema está diseñado para comercios que ya tienen su propio flujo de abastecimiento (compras directas, llamadas telefónicas, proveedores informales). La gestión de órdenes de compra es un producto independiente que requiere: catálogo de proveedores, precios por proveedor, tiempos de entrega, múltiples estados (pendiente, aprobada, recibida, parcial), y conciliación con el stock ledger. Agregarlo al MVP retrasaría la entrega del POS sin aportar valor transaccional directo.</p>
+      <p><strong>Alcance conceptual para Fase 2:</strong> Tabla <code>suppliers</code> con datos de contacto, RUT y condiciones comerciales. Tabla <code>purchase_orders</code> con ítems, estados y recepción parcial. Al recibir una orden de compra, el sistema genera automáticamente los movimientos de entrada en el stock ledger.</p>
+
+      <h3>7. Wizard de Instalación / Onboarding Guiado</h3>
+      <p><strong>Situación en el MVP:</strong> No existe un wizard de instalación. El onboarding inicial se realiza llenando los CRUDs manualmente en orden: crear sucursal → crear store → crear usuario → asignar rol. La hoja de ruta (sección 13) documenta la secuencia lógica, pero cada paso debe ejecutarse a través de las pantallas de administración del sistema.</p>
+      <p><strong>Por qué no está en el MVP:</strong> Un wizard de instalación automatizado requiere lógica transaccional (crear múltiples entidades en una sola transacción), manejo de errores por paso, y pruebas de flujo completo. Es una mejora de experiencia de usuario, no una funcionalidad crítica. El sistema se entrega con seeds precargados (roles, usuario admin por defecto) para reducir la fricción inicial.</p>
+      <p><strong>Alcance conceptual para Fase 2:</strong> Componente Vue <code>SetupWizard.vue</code> con pasos (1) Datos del comercio, (2) Configurar sucursal y POS, (3) Conectar WooCommerce, (4) Crear primer usuario. Cada paso valida antes de avanzar y puede retomarse desde donde se quedó.</p>
+
       <h3>Resumen visual: MVP vs Fase 2</h3>
       <table>
         <tr><th>Funcionalidad</th><th>MVP</th><th>Fase 2</th><th>Fase 3</th></tr>
@@ -2558,12 +2553,12 @@ public function handle(): void
     </article>
 
     <!-- ================================================================ -->
-    <!--  SECCIÓN 10: GUÍA DE FRONTEND                                    -->
+    <!--  SECCIÓN 9: GUÍA DE FRONTEND                                     -->
     <!-- ================================================================ -->
 
-    <!-- 10.1 Especificaciones de Frontend (Vue 3 + Inertia) -->
+    <!-- 9.1 Especificaciones de Frontend (Vue 3 + Inertia) -->
     <article class="page" id="frontend-guide-vue">
-      <div class="section-id">10 · Guía de Frontend</div>
+      <div class="section-id">09 · Guía de Frontend</div>
       <h2>Frontend: Vue 3 + Inertia</h2>
       <p class="lead">Directrices para construir la interfaz del sistema, con énfasis en el módulo de Caja (POS), que es la pantalla más crítica en términos de reactividad y experiencia de usuario.</p>
 
@@ -2721,12 +2716,12 @@ export function useBarcodeScanner() {
     </article>
 
     <!-- ================================================================ -->
-    <!--  SECCIÓN 11: GUÍA DE BACKEND                                     -->
+    <!--  SECCIÓN 10: GUÍA DE BACKEND                                     -->
     <!-- ================================================================ -->
 
-    <!-- 11.1 Motor de Colas y Cron -->
+    <!-- 10.1 Motor de Colas y Cron -->
     <article class="page" id="backend-guide-queues">
-      <div class="section-id">11 · Guía de Backend</div>
+      <div class="section-id">10 · Guía de Backend</div>
       <h2>Motor de Colas y Cron</h2>
       <p class="lead">El sistema no tiene demonios persistentes. Toda la ejecución diferida se apoya en dos pilares: el driver de colas <code>database</code> de Laravel y el programador de tareas (cron) de cPanel. Este patrón es obligatorio, no optativo.</p>
 
@@ -2787,9 +2782,9 @@ export function useBarcodeScanner() {
       </div>
     </article>
 
-    <!-- 11.2 Servicios Transversales -->
+    <!-- 10.2 Servicios Transversales -->
     <article class="page" id="backend-guide-servicios">
-      <div class="section-id">11 · Guía de Backend</div>
+      <div class="section-id">10 · Guía de Backend</div>
       <h2>Servicios Transversales</h2>
       <p class="lead">Componentes de infraestructura que no pertenecen a un dominio específico pero son necesarios para la operación del sistema. Se definen por contrato (interface) y se inyectan por binding en el contenedor de Laravel.</p>
 
@@ -2855,9 +2850,9 @@ $this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
       </table>
     </article>
 
-    <!-- 11.3 Middleware y Seguridad en Rutas -->
+    <!-- 10.3 Middleware y Seguridad en Rutas -->
     <article class="page" id="backend-guide-middleware">
-      <div class="section-id">11 · Guía de Backend</div>
+      <div class="section-id">10 · Guía de Backend</div>
       <h2>Middleware y Seguridad en Rutas</h2>
       <p class="lead">Dos middleware protegen los puntos de entrada del sistema: uno valida que el usuario tenga permiso para operar en una sucursal específica, y otro verifica que los webhooks entrantes sean legítimos.</p>
 
@@ -2946,9 +2941,12 @@ Gate::define('manage-woo-channels', fn(User $user) =>
       </div>
     </article>
 
-    <!-- 11.4 Mapa de Rutas del Sistema -->
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 11: MAPA DE RUTAS DEL SISTEMA                           -->
+    <!-- ================================================================ -->
+
     <article class="page" id="backend-guide-rutas">
-      <div class="section-id">11 · Guía de Backend</div>
+      <div class="section-id">11 · Mapa de Rutas del Sistema</div>
       <h2>Mapa de Rutas del Sistema</h2>
       <p class="lead">Inventario completo de todas las rutas del monolito Laravel. Al usar Inertia.js, el frontend y backend comparten el mismo origen; no existe una API REST interna. La comunicación es vía enrutamiento web clásico con sesiones seguras (Cookies + CSRF).</p>
 
@@ -3139,12 +3137,78 @@ Gate::define('manage-woo-channels', fn(User $user) =>
     </article>
 
     <!-- ================================================================ -->
-    <!--  SECCIÓN 12: HOJA DE RUTA                                        -->
+    <!--  SECCIÓN 12: PREGUNTAS ABIERTAS Y FASE 2                         -->
     <!-- ================================================================ -->
 
-    <!-- 12.1 Secuencia de Construcción -->
+    <article class="page" id="preguntas-webpay-fisico">
+      <div class="section-id">12 · Preguntas Abiertas y Fase 2</div>
+      <h2>Webpay Físico</h2>
+      <p class="lead">La integración con Webpay Plus Presencial (terminal POS físico de Transbank) queda fuera del MVP pero es la funcionalidad más solicitada por los customers.</p>
+
+      <h3>¿Qué implica?</h3>
+      <p>Webpay Plus Presencial requiere un terminal POS físico conectado por puerto serie o Bluetooth a un computador con el sistema POS. Transbank provee un SDK (generalmente DLL en Windows o JAR en Java) que debe ser llamado desde el sistema para iniciar la transacción.</p>
+
+      <h3>Desafíos técnicos</h3>
+      <ul>
+        <li><strong>Compatibilidad con Laravel (PHP):</strong> El SDK de Transbank es para Java/.NET. Habría que crear un bridge (ej. microservicio en Node.js o contenedor Java) que se comunique con Laravel vía socket local o API HTTP.</li>
+        <li><strong>Certificación:</strong> Transbank exige certificación para cada integración. El proceso puede tomar 2-4 semanas.</li>
+        <li><strong>Multi-plataforma:</strong> El POS corre en navegador (cualquier SO), pero el bridge con el terminal POS es dependiente del SO del operador.</li>
+        <li><strong>Sin demonios en <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a>:</strong> El bridge sería un proceso externo que debe ejecutarse en la máquina del operador, no en el servidor.</li>
+      </ul>
+
+      <h3>Arquitectura propuesta (futura)</h3>
+      <pre>┌─────────────┐    WebSocket     ┌──────────────┐    Puerto Serie    ┌──────────┐
+│  Laravel POS │◄──────────────►│  Bridge POS   │◄────────────────►│ Terminal  │
+│  (Navegador) │    localhost    │  (Node.js)    │    / Bluetooth    │ Transbank │
+└─────────────┘    :6001        └──────────────┘                   └──────────┘</pre>
+
+      <div class="warn-box">
+        <strong>Decisión pendiente:</strong> Evaluar si se usa la nueva API REST de Transbank (Webpay API 2.0) que permite integración sin SDK propietario, mediante QR dinámico y pago desde el teléfono del cliente, eliminando la necesidad del bridge local.
+      </div>
+    </article>
+
+    <article class="page" id="preguntas-facturacion-dte">
+      <div class="section-id">12 · Preguntas Abiertas y Fase 2</div>
+      <h2>Facturación DTE</h2>
+      <p class="lead">La facturación electrónica chilena (DTE) es obligatoria para la mayoría de los comercios. Su implementación requiere integración con el SII o un proveedor autorizado.</p>
+
+      <h3>Contexto legal</h3>
+      <p>Chile exige emisión de Documentos Tributarios Electrónicos (DTE) desde 2018 para la mayoría de los contribuyentes. Los tipos de documento relevantes son:</p>
+      <ul>
+        <li><strong>Boleta Electrónica:</strong> Para consumidores finales (sin RUT).</li>
+        <li><strong>Factura Electrónica:</strong> Para empresas (con RUT).</li>
+        <li><strong>Nota de Crédito/Débito:</strong> Para correcciones.</li>
+      </ul>
+
+      <h3>Opciones de integración</h3>
+      <table>
+        <tr><th>Proveedor</th><th>Tipo</th><th>Ventajas</th><th>Desventajas</th></tr>
+        <tr><td>SII Directo (libre)</td><td>API SOAP</td><td>Sin costo por transacción</td><td>Integración compleja, requiere firma electrónica, certificación SII</td></tr>
+        <tr><td>PayMe</td><td>API REST</td><td>SDK moderno, soporte local, precios competitivos</td><td>Costo mensual + por documento</td></tr>
+        <tr><td>Efact</td><td>API REST</td><td>Amplia adopción en Chile, buen soporte</td><td>Costo más alto</td></tr>
+        <tr><td>SimpleFact</td><td>API REST</td><td>Económico, API moderna</td><td>Menos trayectoria</td></tr>
+      </table>
+
+      <h3>Preguntas abiertas para decisión</h3>
+      <ul>
+        <li><strong>¿Se factura desde el POS o desde WooCommerce?</strong> Opción A: El POS emite la boleta/factura al momento de la venta presencial. Opción B: WooCommerce emite los DTE de pedidos web. Lo ideal sería ambos, pero duplica la integración.</li>
+        <li><strong>¿Timing de emisión?</strong> Inmediata (al pagar) vs. diferida (al despachar). La ley permite ambas, pero la inmediata es mejor para el cliente.</li>
+        <li><strong>¿Múltiples <a href="#" data-page="inventario-branches" onclick="location.hash='inventario-branches';return false;">branches</a> con un solo RUT?</strong> Si el cliente tiene un RUT para todas las branches, los DTE se emiten con ese RUT pero deben identificar la sucursal emisora en el detalle.</li>
+        <li><strong>¿RUT de cliente obligatorio?</strong> Para boletas no es obligatorio; para facturas sí. El POS debe manejar ambos flujos.</li>
+      </ul>
+
+      <div class="warn-box">
+        <strong>Decisión pendiente:</strong> Se recomienda integrar con un proveedor tipo PayMe para la Fase 2, ya que reduce drásticamente el tiempo de implementación comparado con la integración directa al SII. El costo por transacción se traslada al cliente como costo operacional.
+      </div>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 13: HOJA DE RUTA                                        -->
+    <!-- ================================================================ -->
+
+    <!-- 13.1 Secuencia de Construcción -->
     <article class="page" id="hoja-ruta-pasos">
-      <div class="section-id">12 · Hoja de Ruta</div>
+      <div class="section-id">13 · Hoja de Ruta</div>
       <h2>Hoja de Ruta (Paso a Paso)</h2>
       <p class="lead">Secuencia lógica de construcción para un desarrollador solitario. Cada paso depende del anterior. No hay fechas ni estimaciones: solo dependencias y criterios de éxito.</p>
 
@@ -3236,7 +3300,7 @@ Gate::define('manage-woo-channels', fn(User $user) =>
       <h3>Paso 6: Reportería, Reconciliación y Despliegue</h3>
       <p><strong>Qué construir:</strong> Los jobs de fondo que mantienen la salud del sistema y los reportes que el administrador usa para tomar decisiones.</p>
       <ul>
-        <li>Crear los Jobs de pre-agregación: <code>AggregateDailySales</code> (cada 30-60 min) y <code>SnapshotStock</code> (cada 15-30 min). Ver sección 8.2 para la implementación.</li>
+        <li>Crear los Jobs de pre-agregación: <code>AggregateDailySales</code> (cada 30-60 min) y <code>SnapshotStock</code> (cada 15-30 min). Ver sección 7.2 para la implementación.</li>
         <li>Crear el Job de <a href="#" data-page="sincronizacion-reconciliacion" onclick="location.hash='sincronizacion-reconciliacion';return false;">reconciliación</a>: <code>SyncReconcileStock</code> programado a las 3:00 AM (ver sección 3.3).</li>
         <li>Configurar las entradas de cron en cPanel para estos jobs.</li>
         <li>Construir las vistas de reportes: resumen de sales del día, histórico de stock, products con stock crítico.</li>
