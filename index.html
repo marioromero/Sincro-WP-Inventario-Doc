@@ -5,14 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Documentación Técnica — POS + Inventario Multi-Sucursal</title>
   <link rel="stylesheet" href="css/styles.css">
+  <script>(function(){var s=localStorage.getItem('doc-theme')||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',s);})();</script>
 </head>
 <body>
 
   <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
     <div class="sidebar-header">
-      <h1>POS + Inventario</h1>
-      <div class="sub">Documentación Técnica · Multi-Sucursal</div>
+      <div>
+        <h1>POS + Inventario</h1>
+        <div class="sub">Documentación Técnica · Multi-Sucursal</div>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Cambiar modo oscuro/claro" title="Modo oscuro">🌙</button>
     </div>
     <nav class="sidebar-nav" id="sidebar-nav"></nav>
   </aside>
@@ -42,10 +46,10 @@
 
       <h3>Diferenciadores clave</h3>
       <ul>
-        <li><strong>Local-First:</strong> El sistema funciona incluso si la conexión a internet cae, gracias al motor de colas con reintentos.</li>
+        <li><strong><a href="#" data-page="vision-general-modelo-standalone" onclick="location.hash='vision-general-modelo-standalone';return false;">Local-First</a>:</strong> El sistema funciona incluso si la conexión a internet cae, gracias al motor de colas con reintentos.</li>
         <li><strong>Multi-sucursal nativo:</strong> Cada sucursal opera con su propio perfil de stock, precios y configuración.</li>
-        <li><strong>Zero CORS:</strong> Al usar Inertia.js sobre Laravel, el frontend y backend comparten el mismo origen, eliminando problemas de CORS en hosting compartido.</li>
-        <li><strong>Sin demonios:</strong> Diseñado para funcionar en cPanel sin procesos persistentes; las tareas diferidas se ejecutan mediante cron.</li>
+        <li><strong>Zero CORS:</strong> Al usar <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Inertia.js</a> sobre Laravel, el frontend y backend comparten el mismo origen, eliminando problemas de CORS en hosting compartido.</li>
+        <li><strong>Sin demonios:</strong> Diseñado para funcionar en <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a> sin procesos persistentes; las tareas diferidas se ejecutan mediante cron.</li>
       </ul>
 
       <div class="info-box">
@@ -65,9 +69,9 @@
       <h3>Ventajas del modelo Standalone</h3>
       <ul>
         <li><strong>Aislamiento tecnológico:</strong> Laravel no comparte el proceso de PHP con WordPress. Una actualización de WooCommerce no rompe el POS.</li>
-        <li><strong>Stack moderno:</strong> Podemos usar Vue 3, Tailwind y Vite sin depender de la cadena de build de WordPress.</li>
+        <li><strong>Stack moderno:</strong> Podemos usar <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Vue 3</a>, Tailwind y <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Vite</a> sin depender de la cadena de build de WordPress.</li>
         <li><strong>Escalabilidad independiente:</strong> Cada sistema puede escalar sus recursos según su demanda específica.</li>
-        <strong>Seguridad:</strong> El panel administrativo no expone rutas de WordPress. Se reduce la superficie de ataque.</li>
+        <li><strong>Seguridad:</strong> El panel administrativo no expone rutas de WordPress. Se reduce la superficie de ataque.</li>
       </ul>
 
       <h3>Arquitectura Local-First</h3>
@@ -80,7 +84,7 @@
       </ol>
 
       <div class="warn-box">
-        <strong>Importante:</strong> El modelo Local-First implica que WooCommerce no es la fuente de verdad del stock. La fuente de verdad es el Stock Ledger del POS. WooCommerce es un reflejo (copia) cuyo rezago máximo esperado es de 1-2 minutos en condiciones normales.
+        <strong>Importante:</strong> El modelo Local-First implica que WooCommerce no es la fuente de verdad del stock. La fuente de verdad es el <a href="#" data-page="inventario-stock-ledger" onclick="location.hash='inventario-stock-ledger';return false;">Stock Ledger</a> del POS. WooCommerce es un reflejo (copia) cuyo rezago máximo esperado es de 1-2 minutos en condiciones normales.
       </div>
     </article>
 
@@ -132,22 +136,22 @@
       <p class="lead">Justificación completa de cada decisión tecnológica, con énfasis en las restricciones del entorno cPanel de hosting compartido chileno.</p>
 
       <h3>Backend: Laravel 11</h3>
-      <p>Laravel es la opción natural para un monolito PHP moderno. Proporciona ORM (Eloquent), sistema de colas con múltiples drivers, autenticación, autorización por políticas, y un ecosistema maduro de paquetes. La versión 11 trae mejoras de rendimiento significativas y una estructura más limpia.</p>
+      <p>Laravel es la opción natural para un monolito PHP moderno. Proporciona ORM (Eloquent), sistema de <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">colas</a> con múltiples drivers, autenticación, autorización por políticas, y un ecosistema maduro de paquetes. La versión 11 trae mejoras de rendimiento significativas y una estructura más limpia.</p>
 
       <h3>Frontend: Vue 3 + Inertia.js</h3>
-      <p><strong>Justificación clave:</strong> En un entorno cPanel, donde no podemos configurar un proxy reverso ni manejar CORS fácilmente, Inertia.js elimina la necesidad de una API REST separada. El frontend Vue 3 se renderiza desde las mismas rutas de Laravel, compartiendo sesión, CSRF y autenticación sin configuración adicional.</p>
+      <p><strong>Justificación clave:</strong> En un entorno <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a>, donde no podemos configurar un proxy reverso ni manejar CORS fácilmente, <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Inertia.js</a> elimina la necesidad de una API REST separada. El frontend <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Vue 3</a> se renderiza desde las mismas rutas de Laravel, compartiendo sesión, CSRF y autenticación sin configuración adicional.</p>
       <blockquote>
         <strong>Alternativa descartada — API stateless (Breeze/Sanctum):</strong> Requeriría manejar tokens JWT, refresh tokens, CORS headers y una doble pipeline de despliegue (frontend separado). En cPanel, cada origen extra es una fuente potencial de bloqueos y bugs difíciles de depurar. Inertia.js reduce la superficie de integración a una sola capa.
       </blockquote>
 
       <h3>Base de Datos: MySQL 8 / MariaDB 10.6+</h3>
-      <p>Motor InnoDB con transacciones ACID. El esquema usa migraciones de Laravel. Se prioriza la integridad referencial sobre la flexibilidad documental (no usamos MongoDB ni bases文档). El driver de colas será <code>database</code> (tabla <code>jobs</code>), no Redis, porque cPanel no ofrece Redis como servicio estándar.</p>
+      <p>Motor InnoDB con transacciones ACID. El esquema usa migraciones de Laravel. Se prioriza la integridad referencial sobre la flexibilidad documental (no usamos MongoDB ni bases documentales). El driver de colas será <code>database</code> (tabla <code>jobs</code>), no Redis, porque cPanel no ofrece Redis como servicio estándar.</p>
 
       <h3>Build Tooling: Vite + Laravel Vite Plugin</h3>
-      <p>Vite reemplaza a Laravel Mix (Webpack). Ofrece HMR ultrarrápido en desarrollo y builds optimizadas en producción. Los assets compilados se sirven desde <code>public/build/</code>.</p>
+      <p><a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Vite</a> reemplaza a Laravel Mix (Webpack). Ofrece HMR ultrarrápido en desarrollo y builds optimizadas en producción. Los assets compilados se sirven desde <code>public/build/</code>.</p>
 
       <h3>Cron como Task Scheduler</h3>
-      <p>En cPanel no podemos mantener un proceso supervisor (como Supervisor en Linux) para gestionar workers de cola. La solución es un cron maestro que ejecuta <code>php artisan queue:work --stop-when-empty</code> cada minuto. Este patrón es estándar en la comunidad Laravel para entornos compartidos.</p>
+      <p>En <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a> no podemos mantener un proceso supervisor (como Supervisor en Linux) para gestionar workers de cola. La solución es un <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">cron</a> maestro que ejecuta <code>php artisan queue:work --stop-when-empty</code> cada minuto. Este patrón es estándar en la comunidad Laravel para entornos compartidos.</p>
 
       <h3>Resumen del Stack</h3>
       <table>
@@ -171,7 +175,7 @@
       <h3>Restricciones conocidas de cPanel</h3>
       <ul>
         <li><strong>Sin demonios persistentes:</strong> No podemos ejecutar <code>php artisan queue:work</code> como un servicio supervisor. No hay <code>systemd</code>, <code>supervisord</code> ni <code>screen/tmux</code> disponible.</li>
-        <li><strong>Cron con intervalo mínimo de 1 minuto:</strong> El scheduler de cPanel permite ejecuciones tan frecuentes como cada minuto. Esto define el límite inferior de latencia de nuestras colas.</li>
+        <li><strong>Cron con intervalo mínimo de 1 minuto:</strong> El scheduler de cPanel permite ejecuciones tan frecuentes como cada minuto. Esto define el límite inferior de latencia de nuestras <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">colas</a>.</li>
         <li><strong>Sin Redis/Memcached garantizado:</strong> La mayoría de planes compartidos no incluyen Redis. Algunos ofrecen Memcached pero con recursos limitados. Usamos la base de datos como driver de cola por defecto.</li>
         <li><strong>PHP-FPM con límites de procesos:</strong> El número de workers PHP está restringido. Laravel Octane (Roadrunner/Swoole) no es viable. Mantenemos el ciclo de vida request-response tradicional.</li>
         <li><strong>Sin control de servidor web:</strong> No podemos configurar Nginx personalizado ni reglas avanzadas de Apache. El archivo <code>.htaccess</code> es nuestra única herramienta de reescritura.</li>
@@ -296,12 +300,12 @@
 
       <h3>Flujo de datos explicado</h3>
       <ol>
-        <li><strong>Navegación del usuario:</strong> El operador POS accede mediante Inertia.js. Las vistas se renderizan desde Laravel (SSR híbrido) sin llamadas API separadas.</li>
-        <li><strong>Operación transaccional:</strong> Cada venta POS impacta primero la base de datos local (Stock Ledger). No depende de WooCommerce para completarse.</li>
-        <li><strong>Encadenamiento asíncrono:</strong> Las operaciones que deben reflejarse en WooCommerce se despachan como Jobs a la cola <code>database</code>.</li>
-        <li><strong>Procesamiento por Cron:</strong> Cada minuto, el cron de cPanel ejecuta <code>php artisan queue:work --stop-when-empty</code>, procesando todos los jobs pendientes.</li>
-        <li><strong>Sincronización saliente:</strong> Los jobs ejecutan llamadas HTTP a la API REST de WooCommerce para actualizar stock, precios o crear productos.</li>
-        <li><strong>Recepción de cambios:</strong> WooCommerce notifica eventos (nuevo pedido web, cambio de stock) vía webhook POST hacia el controlador correspondiente.</li>
+<li><strong>Navegación del usuario:</strong> El operador POS accede mediante <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Inertia.js</a>. Las vistas se renderizan desde Laravel (SSR híbrido) sin llamadas API separadas.</li>
+<li><strong>Operación transaccional:</strong> Cada venta POS impacta primero la base de datos local (<a href="#" data-page="inventario-stock-ledger" onclick="location.hash='inventario-stock-ledger';return false;">Stock Ledger</a>). No depende de WooCommerce para completarse.</li>
+<li><strong>Encadenamiento asíncrono:</strong> Las operaciones que deben reflejarse en WooCommerce se despachan como Jobs a la <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">cola</a> <code>database</code>.</li>
+<li><strong>Procesamiento por Cron:</strong> Cada minuto, el <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">cron</a> de cPanel ejecuta <code>php artisan queue:work --stop-when-empty</code>, procesando todos los jobs pendientes.</li>
+<li><strong>Sincronización saliente:</strong> Los jobs ejecutan llamadas HTTP a la API REST de WooCommerce para actualizar stock, precios o crear productos.</li>
+<li><strong>Recepción de cambios:</strong> WooCommerce notifica eventos (nuevo pedido web, cambio de stock) vía <a href="#" data-page="sincronizacion-webhooks" onclick="location.hash='sincronizacion-webhooks';return false;">webhook</a> POST hacia el controlador correspondiente.</li>
         <li><strong>Consistencia eventual:</strong> El sistema garantiza que el estado de WooCommerce convergerá al estado real, con un rezago máximo esperado de ~1-2 minutos.</li>
       </ol>
     </article>
@@ -313,7 +317,7 @@
       <p class="lead">Mecanismo de licenciamiento diseñado para el MVP: un stub local que siempre responde como activo, con una interfaz preparada para reemplazo futuro por una API real de validación.</p>
 
       <h3>Filosofía: habilitar, no restringir</h3>
-      <p>En la fase MVP, el objetivo es maximizar la adopción y reducir la fricción de instalación. Implementar un sistema de licenciamiento remoto desde el día cero agregaría complejidad operativa (el sistema no funcionaría sin internet), dependencia de un servicio externo aún no construido, y una experiencia de onboarding negativa.</p>
+      <p>En la fase <a href="#" data-page="vision-general-alcance-mvp" onclick="location.hash='vision-general-alcance-mvp';return false;">MVP</a>, el objetivo es maximizar la adopción y reducir la fricción de instalación. Implementar un sistema de licenciamiento remoto desde el día cero agregaría complejidad operativa (el sistema no funcionaría sin internet), dependencia de un servicio externo aún no construido, y una experiencia de onboarding negativa.</p>
       <p>Por eso, el MVP incluye un <strong>Licensing Stub</strong>: un contrato (interface) que el sistema consulta para verificar si la licencia está activa, pero cuya implementación concreta es una clase local que siempre retorna <code>true</code>.</p>
 
       <h3>Diseño del contrato</h3>
@@ -393,7 +397,7 @@ class LocalLicenseStub implements LicenseValidator
         <strong>Prohibición de borrado físico.</strong> Toda tabla con datos transaccionales o maestros debe implementar Soft Deletes (<code>deleted_at DATETIME NULL</code>). No se ejecutan <code>DELETE</code> SQL directos nunca.
       </div>
       <div class="warn-box">
-        <strong>Cifrado a nivel de aplicación.</strong> Los campos sensibles —<code>rut_cifrado</code> (Ley 21.719), <code>consumer_key</code>, <code>consumer_secret</code>, <code>webhook_secret</code>— se almacenan como <code>VARCHAR(255)</code> cifrados con Laravel Crypt. Nunca se consultan ni filtran en SQL directo.
+        <strong>Cifrado a nivel de aplicación.</strong> Los campos sensibles —<code>rut_cifrado</code> (<a href="#" data-page="cumplimiento-privacidad" onclick="location.hash='cumplimiento-privacidad';return false;">Ley 21.719</a>), <code>consumer_key</code>, <code>consumer_secret</code>, <code>webhook_secret</code>— se almacenan como <code>VARCHAR(255)</code> cifrados con Laravel Crypt. Nunca se consultan ni filtran en SQL directo.
       </div>
 
       <div class="info-box">
@@ -844,13 +848,13 @@ class LocalLicenseStub implements LicenseValidator
 
       <h3>13. Notas para el desarrollador</h3>
       <ul>
-        <li>Los índices compuestos marcados en <code>stock_movimientos</code> y <code>ventas</code> son <strong>críticos</strong> para rendimiento en hosting compartido (evitan table scans en los cron de reportes y reconciliación).</li>
+        <li>Los índices compuestos marcados en <code>stock_movimientos</code> y <code>ventas</code> son <strong>críticos</strong> para rendimiento en hosting compartido (evitan table scans en los cron de reportes y <a href="#" data-page="sincronizacion-reconciliacion" onclick="location.hash='sincronizacion-reconciliacion';return false;">reconciliación</a>).</li>
         <li><code>stock_actual</code> debe recalcularse de forma <strong>incremental</strong> (al insertar un movimiento) y no por recomputo total del ledger, salvo en un job de reconciliación periódico que verifique consistencia.</li>
         <li>Todos los campos cifrados (<code>rut_cifrado</code>, <code>consumer_key</code>, <code>consumer_secret</code>, <code>webhook_secret</code>) deben cifrarse/descifrarse exclusivamente a través de un servicio central de la aplicación, nunca en consultas SQL directas.</li>
-        <li>Este diccionario cubre el alcance del MVP; los módulos de Fase 2 (facturación electrónica, pagos reales, licenciamiento centralizado) requerirán tablas adicionales que se definirán al abordar cada uno.</li>
+        <li>Este diccionario cubre el alcance del <a href="#" data-page="vision-general-alcance-mvp" onclick="location.hash='vision-general-alcance-mvp';return false;">MVP</a>; los módulos de Fase 2 (<a href="#" data-page="preguntas-facturacion-dte" onclick="location.hash='preguntas-facturacion-dte';return false;">facturación electrónica</a>, pagos reales, licenciamiento centralizado) requerirán tablas adicionales que se definirán al abordar cada uno.</li>
       </ul>
 
-      <p>→ Consulta el <a href="#inventario-erd">diagrama ERD en Dominio: Inventario y Ventas</a> para la representación visual de las relaciones principales de este esquema.</p>
+      <p>→ Consulta el <a href="#inventario-erd">diagrama ERD en Dominio: Inventario y Catálogo</a> para la representación visual de las relaciones principales de este esquema.</p>
     </article>
 
     <!-- ================================================================ -->
@@ -865,7 +869,7 @@ class LocalLicenseStub implements LicenseValidator
       <h3>Stock: bidireccional con jerarquía POS</h3>
       <p>El stock es bidireccional en el sentido de que ambos sistemas <em>pueden</em> modificarlo (WooCommerce descuenta stock cuando llega un pedido web, el POS descuenta cuando hay venta presencial), pero el POS <strong>siempre impone su valor sobre WooCommerce</strong> cuando hay discrepancia sobre la disponibilidad física local.</p>
       <ul>
-        <li><strong>Venta POS:</strong> descuenta del Stock Ledger local y encola sync hacia WooCommerce.</li>
+        <li><strong>Venta POS:</strong> descuenta del <a href="#" data-page="inventario-stock-ledger" onclick="location.hash='inventario-stock-ledger';return false;">Stock Ledger</a> local y encola sync hacia WooCommerce.</li>
         <li><strong>Pedido web:</strong> WooCommerce descuenta primero; al importar el pedido, el POS verifica y ajusta si el stock web estaba incorrecto.</li>
         <li><strong>Ajuste de inventario:</strong> Siempre se hace en el POS y se propaga a WooCommerce. No se aceptan ajustes desde WooCommerce.</li>
       </ul>
@@ -959,7 +963,7 @@ public function handle(Request \$request, Closure \$next)
 }</pre>
 
       <h3>Integración Saliente: REST API asíncrona (POS → WooCommerce)</h3>
-      <p>Los cambios originados en el POS nunca llaman a la API de WooCommerce de forma síncrona durante una request HTTP del usuario. Siempre se despachan Jobs a la cola <code>database</code>, garantizando que la operación POS no depende de la disponibilidad ni latencia de WooCommerce.</p>
+      <p>Los cambios originados en el POS nunca llaman a la API de WooCommerce de forma síncrona durante una request HTTP del usuario. Siempre se despachan Jobs a la <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">cola</a> <code>database</code>, garantizando que la operación POS no depende de la disponibilidad ni latencia de WooCommerce.</p>
 
       <table>
         <tr><th>Evento POS</th><th>Job</th><th>Endpoint WooCommerce</th><th>Prioridad</th></tr>
@@ -973,9 +977,9 @@ public function handle(Request \$request, Closure \$next)
       <h3>Resiliencia del motor de sincronización</h3>
       <ul>
         <li><strong>Reintentos con backoff:</strong> 5 reintentos con backoff exponencial (30s, 2min, 5min, 15min, 30min).</li>
-        <li><strong>Dead Letter Queue:</strong> Jobs que fallan después de 5 intentos se mueven a tabla <code>failed_jobs</code>. Un comando artisan (<code>php artisan sync:retry-all</code>) permite re-encolarlos manualmente.</li>
+        <li><strong><a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">Dead Letter Queue</a>:</strong> Jobs que fallan después de 5 intentos se mueven a tabla <code>failed_jobs</code>. Un comando artisan (<code>php artisan sync:retry-all</code>) permite re-encolarlos manualmente.</li>
         <li><strong>Idempotencia:</strong> Cada job incluye un UUID en el header <code>X-Idempotency-Key</code>. WooCommerce almacena esta clave por 24h para evitar duplicados si el job se ejecuta más de una vez.</li>
-        <li><strong>Throttling:</strong> Respetamos los límites de rate de la API (usualmente 25 req/s). Se usa el middleware <code>throttle</code> de Laravel HTTP Client con un semáforo por CanalWoo.</li>
+        <li><strong>Throttling:</strong> Respetamos los límites de rate de la API (usualmente 25 req/s). Se usa el middleware <code>throttle</code> de Laravel HTTP Client con un semáforo por <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">CanalWoo</a>.</li>
         <li><strong>Cola por prioridad:</strong> Los jobs de stock usan la cola <code>high</code>; los de clientes, <code>low</code>. El cron procesa primero <code>high</code> antes de tocar <code>low</code>.</li>
       </ul>
     </article>
@@ -987,7 +991,7 @@ public function handle(Request \$request, Closure \$next)
       <p class="lead">Job programado que cruza el stock total del POS contra el stock registrado en WooCommerce para detectar discrepancias y forzar la sincronización.</p>
 
       <h3>¿Por qué es necesaria?</h3>
-      <p>Incluso con un motor de sincronización robusto, pueden ocurrir discrepancias: un webhook no entregado, un job que falló y se perdió en la Dead Letter Queue, una modificación manual directa en WooCommerce, o un error de red transitorio que dejó una operación a medio camino. La reconciliación es la red de seguridad que detecta y corrige estos desajustes.</p>
+      <p>Incluso con un motor de sincronización robusto, pueden ocurrir discrepancias: un <a href="#" data-page="sincronizacion-webhooks" onclick="location.hash='sincronizacion-webhooks';return false;">webhook</a> no entregado, un job que falló y se perdió en la <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">Dead Letter Queue</a>, una modificación manual directa en WooCommerce, o un error de red transitorio que dejó una operación a medio camino. La reconciliación es la red de seguridad que detecta y corrige estos desajustes.</p>
 
       <h3>Diseño del Job de Reconciliación</h3>
       <p>Se implementa como un comando Artisan (<code>php artisan sync:reconcile-stock</code>) que se programa en el cron de cPanel para ejecutarse en ventanas de bajo tráfico (ej. 3:00 AM).</p>
@@ -1034,6 +1038,127 @@ public function handle()
 
       <div class="info-box">
         <strong>Nota:</strong> La reconciliación no reemplaza la sincronización en tiempo real. Es un complemento de verificación periódica. La sincronización vía webhooks + jobs sigue siendo el canal principal.
+      </div>
+    </article>
+
+    <!-- 3.4 Flujo BPMN de Sincronización -->
+    <article class="page" id="sincronizacion-flujo-bpmn">
+      <div class="section-id">03 · Sincronización WooCommerce</div>
+      <h2>Flujo BPMN de Sincronización</h2>
+      <p class="lead">Diagrama del flujo completo que sigue una venta POS desde que ocurre en la sucursal hasta que se refleja en WooCommerce, incluyendo reintentos, webhooks y reconciliación.</p>
+
+      <h3>Diagrama del Flujo</h3>
+      <div class="diagram-container">
+        <svg viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto;">
+          <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#5c6bc0"/>
+            </marker>
+            <marker id="arrow-dashed" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#90a4ae"/>
+            </marker>
+          </defs>
+
+          <!-- Pools / Lanes -->
+          <rect x="10" y="10" width="880" height="70" rx="8" fill="#e0f7fa" opacity="0.4" stroke="#4db6ac" stroke-width="1.5"/>
+          <text x="20" y="35" font-size="11" fill="#00695c" font-weight="600">Sucursal (POS)</text>
+
+          <rect x="10" y="85" width="880" height="80" rx="8" fill="#e8eaf6" opacity="0.4" stroke="#5c6bc0" stroke-width="1.5"/>
+          <text x="20" y="110" font-size="11" fill="#283593" font-weight="600">Backend Laravel</text>
+
+          <rect x="10" y="170" width="880" height="70" rx="8" fill="#f3e5f5" opacity="0.4" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="20" y="195" font-size="11" fill="#6a1b9a" font-weight="600">WooCommerce (externo)</text>
+
+          <rect x="10" y="245" width="880" height="75" rx="8" fill="#fff3e0" opacity="0.4" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="20" y="270" font-size="11" fill="#e65100" font-weight="600">Cron / Queue (cPanel)</text>
+
+          <!-- BPMN Nodes -->
+          <circle cx="60" cy="45" r="14" fill="#fff" stroke="#4db6ac" stroke-width="2"/>
+          <text x="60" y="49" text-anchor="middle" font-size="12" fill="#00695c">●</text>
+          <text x="60" y="75" text-anchor="middle" font-size="9" fill="#00695c">Inicio</text>
+
+          <rect x="130" y="30" width="100" height="36" rx="8" fill="#fff" stroke="#4db6ac" stroke-width="1.5"/>
+          <text x="180" y="44" text-anchor="middle" font-size="10" fill="#1a1a2e">Venta POS</text>
+          <text x="180" y="58" text-anchor="middle" font-size="8" fill="#546e7a">(store sale)</text>
+
+          <line x1="88" y1="45" x2="130" y2="45" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+          <rect x="280" y="30" width="100" height="36" rx="8" fill="#fff" stroke="#4db6ac" stroke-width="1.5"/>
+          <text x="330" y="44" text-anchor="middle" font-size="10" fill="#1a1a2e">Stock Ledger</text>
+          <text x="330" y="58" text-anchor="middle" font-size="8" fill="#546e7a">(movimiento -1)</text>
+
+          <line x1="230" y1="45" x2="280" y2="45" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+          <polygon points="440,48 450,36 470,36 460,48" fill="#fff" stroke="#5c6bc0" stroke-width="1.5"/>
+          <text x="455" y="60" text-anchor="middle" font-size="8" fill="#283593">¿OK?</text>
+
+          <line x1="380" y1="45" x2="430" y2="45" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+          <rect x="520" y="100" width="110" height="36" rx="8" fill="#fff" stroke="#5c6bc0" stroke-width="1.5"/>
+          <text x="575" y="114" text-anchor="middle" font-size="10" fill="#1a1a2e">SyncStockToWC</text>
+          <text x="575" y="128" text-anchor="middle" font-size="8" fill="#546e7a">(dispatch job)</text>
+
+          <polyline points="455,42 490,42 490,118 520,118" stroke="#5c6bc0" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+
+          <rect x="520" y="190" width="110" height="36" rx="8" fill="#fff" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="575" y="204" text-anchor="middle" font-size="10" fill="#1a1a2e">API WooCommerce</text>
+          <text x="575" y="218" text-anchor="middle" font-size="8" fill="#546e7a">(REST PUT /stock)</text>
+
+          <line x1="575" y1="136" x2="575" y2="190" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+          <polygon points="690,208 700,196 720,196 710,208" fill="#fff" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="705" y="220" text-anchor="middle" font-size="8" fill="#6a1b9a">HTTP 200?</text>
+
+          <line x1="630" y1="208" x2="682" y2="208" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+          <rect x="760" y="190" width="110" height="36" rx="8" fill="#fff" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="815" y="204" text-anchor="middle" font-size="10" fill="#1a1a2e">Registro OK</text>
+          <text x="815" y="218" text-anchor="middle" font-size="8" fill="#546e7a">(sync_eventos)</text>
+
+          <line x1="720" y1="208" x2="760" y2="208" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+          <circle cx="815" cy="260" r="14" fill="#fff" stroke="#4db6ac" stroke-width="2"/>
+          <text x="815" y="264" text-anchor="middle" font-size="12" fill="#00695c">◼</text>
+          <text x="815" y="285" text-anchor="middle" font-size="9" fill="#00695c">Fin</text>
+
+          <line x1="815" y1="226" x2="815" y2="246" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+          <!-- Fallo / Retry -->
+          <text x="695" y="188" font-size="9" fill="#e65100">No</text>
+          <polyline points="705,202 730,202 730,265 280,265 280,66" stroke="#ef5350" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#arrow-dashed)"/>
+          <text x="500" y="278" font-size="9" fill="#ef5350" font-weight="600">Reintento (hasta 5, backoff 30s-30min)</text>
+
+          <!-- Cron -->
+          <rect x="280" y="260" width="100" height="36" rx="8" fill="#fff" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="330" y="274" text-anchor="middle" font-size="10" fill="#1a1a2e">Cron cada 1 min</text>
+          <text x="330" y="288" text-anchor="middle" font-size="8" fill="#546e7a">queue:work --once</text>
+
+          <line x1="380" y1="280" x2="440" y2="280" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+          <rect x="450" y="260" width="100" height="36" rx="8" fill="#fff" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="500" y="274" text-anchor="middle" font-size="10" fill="#1a1a2e">Jobs DB Queue</text>
+          <text x="500" y="288" text-anchor="middle" font-size="8" fill="#546e7a">(jobs table)</text>
+
+          <line x1="550" y1="280" x2="575" y2="226" stroke="#5c6bc0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+          <!-- Fallo máximo -->
+          <text x="600" y="305" font-size="9" fill="#c62828">5 fallos → failed_jobs (DLQ)</text>
+        </svg>
+      </div>
+      <div class="diagram-caption">Figura 3.4 — Flujo BPMN de sincronización POS → WooCommerce con reintentos y cola DB</div>
+
+      <h3>Descripción del flujo</h3>
+      <ol>
+<li><strong>Venta POS:</strong> El cajero registra una venta en la sucursal. El sistema registra el movimiento en el <a href="#" data-page="inventario-stock-ledger" onclick="location.hash='inventario-stock-ledger';return false;">Stock Ledger</a> (disminuye stock).</li>
+<li><strong>Dispatch Job:</strong> Tras confirmar el movimiento, se despacha <code>SyncStockToWooCommerce</code> a la <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">cola</a> <code>high</code>.</li>
+        <li><strong>Cron + DB Queue:</strong> Cada minuto cron ejecuta <code>queue:work --stop-when-empty</code>, que toma los jobs pendientes de la tabla <code>jobs</code>.</li>
+        <li><strong>API WooCommerce:</strong> El job ejecuta un PUT contra <code>/wp-json/wc/v3/products/{id}</code> actualizando el stock.</li>
+        <li><strong>Registro OK:</strong> Si la respuesta es 200, se registra en <code>sync_eventos</code> con estado <code>completado</code>.</li>
+        <li><strong>Reintento:</strong> Si falla (timeout, 429, 5xx), se reintenta hasta 5 veces con backoff progresivo (30s, 1min, 3min, 10min, 30min).</li>
+        <li><strong>DLQ:</strong> Tras 5 fallos, el job pasa a <code>failed_jobs</code> y se notifica al admin.</li>
+      </ol>
+
+      <div class="warn-box">
+        <strong>Nota importante:</strong> La <a href="#" data-page="sincronizacion-reconciliacion" onclick="location.hash='sincronizacion-reconciliacion';return false;">reconciliación</a> (3.3) y el flujo BPMN son complementarios. El flujo BPMN maneja la sincronización en caliente (tiempo real); la reconciliación es la verificación en frío (diaria) que corrige desvíos acumulados.
       </div>
     </article>
 
@@ -1105,7 +1230,7 @@ public function handle()
 }</pre>
 
       <div class="info-box">
-        <strong>Nota de rendimiento:</strong> Para inventarios de &lt;100k movimientos por sucursal, la suma directa con índice compuesto es suficientemente rápida (&lt;50ms). Para volúmenes mayores, implementar tabla de resumen (<code>branch_product_stock</code>) actualizada por eventos de dominio.
+        <strong>Nota de rendimiento:</strong> Para inventarios de &lt;100k movimientos por <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">sucursal</a>, la suma directa con índice compuesto es suficientemente rápida (&lt;50ms). Para volúmenes mayores, implementar tabla de resumen (<code>branch_product_stock</code>) actualizada por eventos de dominio.
       </div>
     </article>
 
@@ -1159,10 +1284,10 @@ public function handle()
 
       <h3>Multi-sucursal + Multi-canal: reglas de negocio</h3>
       <ul>
-        <li>Un <strong>CanalWoo</strong> pertenece a una sucursal por defecto. Los pedidos web de ese canal se asignan inicialmente a esa sucursal (luego puede reasignarse por ruta de despacho).</li>
-        <li>Cada <strong>CanalWoo</strong> tiene sus propias credenciales API y su propio webhook secret. La sincronización itera por canal.</li>
-        <li>Un producto puede estar publicado en múltiples canales WooCommerce, cada uno con su propio ID remoto y posiblemente SKU diferente.</li>
-        <li>La reconciliación de stock se ejecuta por canal: el stock total del POS se distribuye según la configuración de cada canal (ej. Canal A recibe el 100% del stock de sucursal 1; Canal B recibe la suma de sucursales 1 y 2).</li>
+<li>Un <strong>CanalWoo</strong> pertenece a una sucursal por defecto. Los pedidos web de ese canal se asignan inicialmente a esa sucursal (luego puede reasignarse por <a href="#" data-page="ventas-rutas-despacho" onclick="location.hash='ventas-rutas-despacho';return false;">ruta de despacho</a>).</li>
+<li>Cada <strong>CanalWoo</strong> tiene sus propias credenciales API y su propio <a href="#" data-page="sincronizacion-webhooks" onclick="location.hash='sincronizacion-webhooks';return false;">webhook</a> secret. La sincronización itera por canal.</li>
+<li>Un producto puede estar publicado en múltiples canales WooCommerce, cada uno con su propio ID remoto y posiblemente SKU diferente.</li>
+<li>La <a href="#" data-page="sincronizacion-reconciliacion" onclick="location.hash='sincronizacion-reconciliacion';return false;">reconciliación de stock</a> se ejecuta por canal: el stock total del POS se distribuye según la configuración de cada canal (ej. Canal A recibe el 100% del stock de sucursal 1; Canal B recibe la suma de sucursales 1 y 2).</li>
       </ul>
 
       <h3>Transferencias entre sucursales</h3>
@@ -1180,248 +1305,481 @@ public function handle()
       <p class="lead">Modelo de datos del núcleo del sistema: entidades principales, sus atributos clave y relaciones.</p>
 
       <div class="diagram-container">
-        <svg viewBox="0 0 1050 750" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama entidad-relación del sistema POS+Inventario">
+        <svg viewBox="0 0 1600 1720" width="1600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama entidad-relación completo del sistema POS+Inventario (28 tablas)">
 
           <defs>
-            <marker id="arrow-1n" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M 0 0 L 12 6 L 0 12 z" fill="#888"/>
+            <marker id="a-end" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M 0 0 L 12 6 L 0 12 z" fill="#666"/>
             </marker>
-            <marker id="crow-1n" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="8" markerHeight="8" orient="auto">
-              <line x1="0" y1="0" x2="12" y2="6" stroke="#888" stroke-width="1.2"/>
-              <line x1="0" y1="12" x2="12" y2="6" stroke="#888" stroke-width="1.2"/>
+            <marker id="crow-end" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="8" markerHeight="8" orient="auto">
+              <line x1="1" y1="1" x2="13" y2="7" stroke="#666" stroke-width="1.2"/>
+              <line x1="1" y1="13" x2="13" y2="7" stroke="#666" stroke-width="1.2"/>
             </marker>
           </defs>
 
-          <!-- ============================== ROW 1: ORGANIZACIÓN ============================== -->
+          <!-- ================================================================
+               SECTION 1: ORGANIZACIÓN Y CANALES
+               ================================================================ -->
+          <rect x="20" y="20" width="1560" height="240" rx="14" fill="#e8eaf6" opacity="0.35"/>
+          <rect x="30" y="32" width="200" height="26" rx="6" fill="#3f51b5" opacity="0.9"/>
+          <text x="130" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#fff">Organización y Canales</text>
 
           <!-- roles -->
-          <rect x="20" y="20" width="130" height="85" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
-          <rect x="20" y="20" width="130" height="24" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
-          <text x="85" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">roles</text>
-          <text x="32" y="61" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="32" y="75" font-family="Arial, sans-serif" font-size="9" fill="#555">nombre: VARCHAR UNIQUE</text>
-          <text x="32" y="89" font-family="Arial, sans-serif" font-size="9" fill="#555">nivel_jerarquico: TINYINT</text>
+          <rect x="40" y="70" width="320" height="80" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
+          <rect x="40" y="70" width="320" height="24" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
+          <text x="200" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">roles</text>
+          <text x="52" y="111" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="52" y="125" font-family="Arial, sans-serif" font-size="9" fill="#333">nombre: VARCHAR UNIQUE</text>
+          <text x="52" y="139" font-family="Arial, sans-serif" font-size="9" fill="#333">nivel_jerarquico: TINYINT</text>
 
           <!-- usuarios -->
-          <rect x="185" y="20" width="185" height="115" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
-          <rect x="185" y="20" width="185" height="24" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
-          <text x="277" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">usuarios</text>
-          <text x="197" y="61" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="197" y="75" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK rol_id → roles (RESTRICT)</text>
-          <text x="197" y="89" font-family="Arial, sans-serif" font-size="9" fill="#555">nombre: VARCHAR(150)</text>
-          <text x="197" y="103" font-family="Arial, sans-serif" font-size="9" fill="#555">email: VARCHAR UNIQUE</text>
-          <text x="197" y="117" font-family="Arial, sans-serif" font-size="9" fill="#555">password: hashed</text>
-          <text x="197" y="131" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps, soft delete</text>
+          <rect x="420" y="70" width="320" height="125" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
+          <rect x="420" y="70" width="320" height="24" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
+          <text x="580" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">usuarios</text>
+          <text x="432" y="111" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="432" y="125" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK rol_id → roles (RESTRICT)</text>
+          <text x="432" y="139" font-family="Arial, sans-serif" font-size="9" fill="#333">nombre: VARCHAR(150)</text>
+          <text x="432" y="153" font-family="Arial, sans-serif" font-size="9" fill="#333">email: VARCHAR UNIQUE</text>
+          <text x="432" y="167" font-family="Arial, sans-serif" font-size="9" fill="#333">password: hashed</text>
+          <text x="432" y="181" font-family="Arial, sans-serif" font-size="9" fill="#333">acceso_todas_sucursales: TINYINT</text>
+          <text x="432" y="195" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps, soft delete</text>
 
           <!-- sucursales -->
-          <rect x="415" y="20" width="180" height="115" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
-          <rect x="415" y="20" width="180" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
-          <text x="505" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">sucursales</text>
-          <text x="427" y="61" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="427" y="75" font-family="Arial, sans-serif" font-size="9" fill="#555">nombre: VARCHAR(150)</text>
-          <text x="427" y="89" font-family="Arial, sans-serif" font-size="9" fill="#555">codigo: VARCHAR UNIQUE</text>
-          <text x="427" y="103" font-family="Arial, sans-serif" font-size="9" fill="#555">comuna: VARCHAR INDEX</text>
-          <text x="427" y="117" font-family="Arial, sans-serif" font-size="9" fill="#555">activa: TINYINT INDEX</text>
-          <text x="427" y="131" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps, soft delete</text>
+          <rect x="800" y="70" width="320" height="125" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <rect x="800" y="70" width="320" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
+          <text x="960" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">sucursales</text>
+          <text x="812" y="111" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="812" y="125" font-family="Arial, sans-serif" font-size="9" fill="#333">nombre: VARCHAR(150)</text>
+          <text x="812" y="139" font-family="Arial, sans-serif" font-size="9" fill="#333">codigo: VARCHAR UNIQUE</text>
+          <text x="812" y="153" font-family="Arial, sans-serif" font-size="9" fill="#333">comuna: VARCHAR INDEX</text>
+          <text x="812" y="167" font-family="Arial, sans-serif" font-size="9" fill="#333">es_virtual / activa: TINYINT</text>
+          <text x="812" y="181" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps, soft delete</text>
 
           <!-- tiendas -->
-          <rect x="640" y="20" width="200" height="115" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
-          <rect x="640" y="20" width="200" height="24" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
-          <text x="740" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">tiendas (Woo)</text>
-          <text x="652" y="61" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="652" y="75" font-family="Arial, sans-serif" font-size="9" fill="#555">url_base: VARCHAR UNIQUE</text>
-          <text x="652" y="89" font-family="Arial, sans-serif" font-size="9" fill="#555">consumer_key / secret: encrypted</text>
-          <text x="652" y="103" font-family="Arial, sans-serif" font-size="9" fill="#555">webhook_secret: encrypted</text>
-          <text x="652" y="117" font-family="Arial, sans-serif" font-size="9" fill="#555">FK sucursal_despacho_default_id</text>
-          <text x="652" y="131" font-family="Arial, sans-serif" font-size="8" fill="#999">modo_enrutamiento + timestamps</text>
+          <rect x="1180" y="70" width="360" height="125" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
+          <rect x="1180" y="70" width="360" height="24" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="1360" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">tiendas (WooCommerce)</text>
+          <text x="1192" y="111" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="1192" y="125" font-family="Arial, sans-serif" font-size="9" fill="#333">url_base: VARCHAR UNIQUE</text>
+          <text x="1192" y="139" font-family="Arial, sans-serif" font-size="9" fill="#333">consumer_key / secret: encrypted</text>
+          <text x="1192" y="153" font-family="Arial, sans-serif" font-size="9" fill="#333">webhook_secret: encrypted</text>
+          <text x="1192" y="167" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK sucursal_despacho_default_id</text>
+          <text x="1192" y="181" font-family="Arial, sans-serif" font-size="8" fill="#999">modo_enrutamiento + timestamps</text>
 
-          <!-- Pivot: usuario_sucursal -->
-          <rect x="350" y="160" width="120" height="45" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1" stroke-dasharray="4,3"/>
-          <rect x="350" y="160" width="120" height="20" rx="6" fill="#b2ebf2" stroke="#80deea" stroke-width="1" stroke-dasharray="4,3"/>
-          <text x="410" y="174" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#00695c">usuario_sucursal</text>
-          <text x="360" y="196" font-family="Arial, sans-serif" font-size="8" fill="#555">PK compuesta (usuario_id, sucursal_id)</text>
+          <!-- usuario_sucursal pivot -->
+          <rect x="540" y="215" width="320" height="45" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1" stroke-dasharray="5,3"/>
+          <rect x="540" y="215" width="320" height="20" rx="6" fill="#b2ebf2" stroke="#80deea" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="700" y="229" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#00695c">usuario_sucursal (pivote)</text>
+          <text x="550" y="252" font-family="Arial, sans-serif" font-size="8" fill="#555">PK compuesta: (usuario_id, sucursal_id)</text>
 
-          <!-- ============================== ROW 2: CATÁLOGO ============================== -->
+          <!-- ================================================================
+               SECTION 2: CATÁLOGO
+               ================================================================ -->
+          <rect x="20" y="280" width="1560" height="370" rx="14" fill="#e0f7fa" opacity="0.35"/>
+          <rect x="30" y="292" width="140" height="26" rx="6" fill="#00897b" opacity="0.9"/>
+          <text x="100" y="310" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#fff">Catálogo</text>
 
           <!-- categorias -->
-          <rect x="20" y="200" width="160" height="90" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
-          <rect x="20" y="200" width="160" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
-          <text x="100" y="216" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">categorias</text>
-          <text x="32" y="241" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="32" y="255" font-family="Arial, sans-serif" font-size="9" fill="#555">FK categoria_padre_id (self)</text>
-          <text x="32" y="269" font-family="Arial, sans-serif" font-size="9" fill="#555">nombre: VARCHAR(150)</text>
-          <text x="32" y="283" font-family="Arial, sans-serif" font-size="8" fill="#999">slug UNIQUE + timestamps</text>
+          <rect x="40" y="330" width="320" height="85" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <rect x="40" y="330" width="320" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
+          <text x="200" y="346" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">categorias</text>
+          <text x="52" y="371" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="52" y="385" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK categoria_padre_id → self</text>
+          <text x="52" y="399" font-family="Arial, sans-serif" font-size="9" fill="#333">nombre / slug: VARCHAR UNIQUE</text>
+
+          <!-- categoria_tienda_mapeo pivot -->
+          <rect x="40" y="440" width="320" height="55" rx="6" fill="#fff3e0" stroke="#ffcc80" stroke-width="1" stroke-dasharray="5,3"/>
+          <rect x="40" y="440" width="320" height="20" rx="6" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="200" y="454" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#e65100">categoria_tienda_mapeo (pivote)</text>
+          <text x="52" y="478" font-family="Arial, sans-serif" font-size="8" fill="#555">FK categoria_id / FK tienda_id</text>
+          <text x="52" y="490" font-family="Arial, sans-serif" font-size="7.5" fill="#888">UNIQUE (categoria_id, tienda_id)</text>
 
           <!-- productos -->
-          <rect x="210" y="200" width="190" height="115" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
-          <rect x="210" y="200" width="190" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
-          <text x="305" y="216" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">productos</text>
-          <text x="222" y="241" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="222" y="255" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK categoria_id → categorias</text>
-          <text x="222" y="269" font-family="Arial, sans-serif" font-size="9" fill="#555">tipo: ENUM(simple|variable)</text>
-          <text x="222" y="283" font-family="Arial, sans-serif" font-size="9" fill="#555">nombre: VARCHAR(255) INDEX</text>
-          <text x="222" y="297" font-family="Arial, sans-serif" font-size="9" fill="#555">codigo_interno: VARCHAR UNIQUE</text>
-          <text x="222" y="311" font-family="Arial, sans-serif" font-size="8" fill="#999">origen_creacion + timestamps + soft del</text>
+          <rect x="420" y="330" width="320" height="115" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <rect x="420" y="330" width="320" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
+          <text x="580" y="346" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">productos</text>
+          <text x="432" y="371" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="432" y="385" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK categoria_id → categorias</text>
+          <text x="432" y="399" font-family="Arial, sans-serif" font-size="9" fill="#333">tipo: ENUM(simple | variable)</text>
+          <text x="432" y="413" font-family="Arial, sans-serif" font-size="9" fill="#333">nombre: VARCHAR(255) INDEX</text>
+          <text x="432" y="427" font-family="Arial, sans-serif" font-size="9" fill="#333">codigo_interno: VARCHAR UNIQUE</text>
+          <text x="432" y="441" font-family="Arial, sans-serif" font-size="8" fill="#999">origen_creacion + timestamps + soft delete</text>
 
           <!-- producto_variantes -->
-          <rect x="440" y="200" width="190" height="115" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
-          <rect x="440" y="200" width="190" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
-          <text x="535" y="216" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">producto_variantes</text>
-          <text x="452" y="241" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="452" y="255" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK producto_id → productos</text>
-          <text x="452" y="269" font-family="Arial, sans-serif" font-size="9" fill="#555"><tspan font-weight="bold" fill="#1a1a2e">sku</tspan>: VARCHAR UNIQUE</text>
-          <text x="452" y="283" font-family="Arial, sans-serif" font-size="9" fill="#555">precio_base: DECIMAL(12,2)</text>
-          <text x="452" y="297" font-family="Arial, sans-serif" font-size="9" fill="#555">unidad_medida: ENUM</text>
-          <text x="452" y="311" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps, soft delete</text>
+          <rect x="800" y="330" width="320" height="115" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <rect x="800" y="330" width="320" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
+          <text x="960" y="346" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">producto_variantes</text>
+          <text x="812" y="371" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="812" y="385" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK producto_id → productos</text>
+          <text x="812" y="399" font-family="Arial, sans-serif" font-size="9" fill="#333">sku: VARCHAR UNIQUE</text>
+          <text x="812" y="413" font-family="Arial, sans-serif" font-size="9" fill="#333">precio_base / precio_web: DECIMAL</text>
+          <text x="812" y="427" font-family="Arial, sans-serif" font-size="9" fill="#333">unidad_medida: ENUM</text>
+          <text x="812" y="441" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps, soft delete</text>
 
-          <!-- Pivot: producto_tienda_mapeo -->
-          <rect x="670" y="200" width="210" height="90" rx="6" fill="#fff3e0" stroke="#ffcc80" stroke-width="1" stroke-dasharray="4,3"/>
-          <rect x="670" y="200" width="210" height="20" rx="6" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1" stroke-dasharray="4,3"/>
-          <text x="775" y="214" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#e65100">producto_tienda_mapeo</text>
-          <text x="682" y="238" font-family="Arial, sans-serif" font-size="8" fill="#555">PK id: BIGINT</text>
-          <text x="682" y="252" font-family="Arial, sans-serif" font-size="8" fill="#C33">FK producto_variante_id → variantes</text>
-          <text x="682" y="266" font-family="Arial, sans-serif" font-size="8" fill="#C33">FK tienda_id → tiendas</text>
-          <text x="682" y="280" font-family="Arial, sans-serif" font-size="8" fill="#555">woo_product_id / woo_variation_id</text>
+          <!-- producto_tienda_mapeo pivot -->
+          <rect x="800" y="470" width="320" height="60" rx="6" fill="#fff3e0" stroke="#ffcc80" stroke-width="1" stroke-dasharray="5,3"/>
+          <rect x="800" y="470" width="320" height="20" rx="6" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="960" y="484" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#e65100">producto_tienda_mapeo (pivote)</text>
+          <text x="812" y="508" font-family="Arial, sans-serif" font-size="8" fill="#555">FK producto_variante_id / FK tienda_id</text>
+          <text x="812" y="520" font-family="Arial, sans-serif" font-size="8" fill="#555">woo_product_id / woo_variation_id</text>
+          <text x="812" y="530" font-family="Arial, sans-serif" font-size="7.5" fill="#888">UNIQUE (variante_id, tienda_id)</text>
 
-          <!-- ============================== ROW 3: CLIENTES Y VENTAS ============================== -->
+          <!-- atributos -->
+          <rect x="1180" y="330" width="360" height="75" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <rect x="1180" y="330" width="360" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
+          <text x="1360" y="346" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">atributos</text>
+          <text x="1192" y="371" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="1192" y="385" font-family="Arial, sans-serif" font-size="9" fill="#333">nombre: VARCHAR(100) UNIQUE</text>
+          <text x="1192" y="399" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps</text>
+
+          <!-- valores_atributo -->
+          <rect x="1180" y="430" width="360" height="65" rx="8" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+          <rect x="1180" y="430" width="360" height="24" rx="8" fill="#b2ebf2" stroke="#80deea" stroke-width="1.5"/>
+          <text x="1360" y="446" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">valores_atributo</text>
+          <text x="1192" y="471" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="1192" y="485" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK atributo_id → atributos</text>
+
+          <!-- producto_variante_valores pivot -->
+          <rect x="1180" y="520" width="360" height="50" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1" stroke-dasharray="5,3"/>
+          <rect x="1180" y="520" width="360" height="20" rx="6" fill="#b2ebf2" stroke="#80deea" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="1360" y="534" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#00695c">producto_variante_valores (pivote)</text>
+          <text x="1192" y="560" font-family="Arial, sans-serif" font-size="8" fill="#555">PK compuesta: (producto_variante_id, valor_atributo_id)</text>
+
+          <!-- ================================================================
+               SECTION 3: CLIENTES Y CONFIGURACIÓN
+               ================================================================ -->
+          <rect x="20" y="670" width="1560" height="260" rx="14" fill="#fff3e0" opacity="0.35"/>
+          <rect x="30" y="682" width="200" height="26" rx="6" fill="#e65100" opacity="0.9"/>
+          <text x="130" y="700" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#fff">Clientes y Configuración</text>
 
           <!-- clientes -->
-          <rect x="20" y="380" width="185" height="115" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
-          <rect x="20" y="380" width="185" height="24" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
-          <text x="112" y="396" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">clientes</text>
-          <text x="32" y="421" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="32" y="435" font-family="Arial, sans-serif" font-size="9" fill="#555">nombre: VARCHAR(150)</text>
-          <text x="32" y="449" font-family="Arial, sans-serif" font-size="9" fill="#555"><tspan fill="#C33">rut_cifrado:</tspan> encrypted</text>
-          <text x="32" y="463" font-family="Arial, sans-serif" font-size="9" fill="#555">email: VARCHAR UNIQUE</text>
-          <text x="32" y="477" font-family="Arial, sans-serif" font-size="9" fill="#555">consentimiento_datos: TINYINT</text>
-          <text x="32" y="491" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps, soft delete</text>
+          <rect x="40" y="720" width="320" height="115" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
+          <rect x="40" y="720" width="320" height="24" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="200" y="736" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">clientes</text>
+          <text x="52" y="761" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="52" y="775" font-family="Arial, sans-serif" font-size="9" fill="#333">nombre: VARCHAR(150)</text>
+          <text x="52" y="789" font-family="Arial, sans-serif" font-size="9" fill="#c33">rut_cifrado: encrypted (Laravel Crypt)</text>
+          <text x="52" y="803" font-family="Arial, sans-serif" font-size="9" fill="#333">email: VARCHAR UNIQUE</text>
+          <text x="52" y="817" font-family="Arial, sans-serif" font-size="9" fill="#333">consentimiento_datos / anonimizado</text>
+          <text x="52" y="831" font-family="Arial, sans-serif" font-size="8" fill="#999">+ timestamps, soft delete</text>
+
+          <!-- cliente_tienda_mapeo pivot -->
+          <rect x="420" y="720" width="320" height="55" rx="6" fill="#fff3e0" stroke="#ffcc80" stroke-width="1" stroke-dasharray="5,3"/>
+          <rect x="420" y="720" width="320" height="20" rx="6" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="580" y="734" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#e65100">cliente_tienda_mapeo (pivote)</text>
+          <text x="432" y="758" font-family="Arial, sans-serif" font-size="8" fill="#555">FK cliente_id / FK tienda_id</text>
+          <text x="432" y="770" font-family="Arial, sans-serif" font-size="7.5" fill="#888">UNIQUE (cliente_id, tienda_id)</text>
+
+          <!-- clientes_solicitudes_privacidad -->
+          <rect x="800" y="720" width="320" height="85" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
+          <rect x="800" y="720" width="320" height="24" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="960" y="736" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">clientes_solicitudes_privacidad</text>
+          <text x="812" y="761" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="812" y="775" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK cliente_id → clientes</text>
+          <text x="812" y="789" font-family="Arial, sans-serif" font-size="9" fill="#333">tipo_solicitud: ENUM (ARCO+)</text>
+          <text x="812" y="803" font-family="Arial, sans-serif" font-size="9" fill="#333">estado: ENUM</text>
+
+          <!-- configuracion_sistema -->
+          <rect x="1180" y="720" width="360" height="75" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
+          <rect x="1180" y="720" width="360" height="24" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="1360" y="736" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">configuracion_sistema</text>
+          <text x="1192" y="761" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="1192" y="775" font-family="Arial, sans-serif" font-size="9" fill="#333">clave: VARCHAR UNIQUE</text>
+          <text x="1192" y="789" font-family="Arial, sans-serif" font-size="9" fill="#333">valor: TEXT / tipo_dato: ENUM</text>
+
+          <!-- licencia_estado -->
+          <rect x="1180" y="820" width="360" height="75" rx="8" fill="#fff3e0" stroke="#ffcc80" stroke-width="1.5"/>
+          <rect x="1180" y="820" width="360" height="24" rx="8" fill="#ffe0b2" stroke="#ffcc80" stroke-width="1.5"/>
+          <text x="1360" y="836" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">licencia_estado</text>
+          <text x="1192" y="861" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="1192" y="875" font-family="Arial, sans-serif" font-size="9" fill="#333">llave_instalacion: VARCHAR UNIQUE</text>
+          <text x="1192" y="889" font-family="Arial, sans-serif" font-size="9" fill="#333">estado + fecha_vencimiento</text>
+
+          <!-- ================================================================
+               SECTION 4: VENTAS Y CAJA
+               ================================================================ -->
+          <rect x="20" y="950" width="1560" height="270" rx="14" fill="#f3e5f5" opacity="0.35"/>
+          <rect x="30" y="962" width="160" height="26" rx="6" fill="#7b1fa2" opacity="0.9"/>
+          <text x="110" y="980" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#fff">Ventas y Caja</text>
+
+          <!-- sesiones_caja -->
+          <rect x="40" y="1010" width="320" height="95" rx="8" fill="#f3e5f5" stroke="#ce93d8" stroke-width="1.5"/>
+          <rect x="40" y="1010" width="320" height="24" rx="8" fill="#e1bee7" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="200" y="1026" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">sesiones_caja</text>
+          <text x="52" y="1051" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="52" y="1065" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK sucursal_id / FK usuario_id</text>
+          <text x="52" y="1079" font-family="Arial, sans-serif" font-size="9" fill="#333">monto_inicial / monto_final: DECIMAL</text>
+          <text x="52" y="1093" font-family="Arial, sans-serif" font-size="9" fill="#333">estado: ENUM(abierta|cerrada)</text>
 
           <!-- ventas -->
-          <rect x="250" y="380" width="210" height="130" rx="8" fill="#f3e5f5" stroke="#ce93d8" stroke-width="1.5"/>
-          <rect x="250" y="380" width="210" height="24" rx="8" fill="#e1bee7" stroke="#ce93d8" stroke-width="1.5"/>
-          <text x="355" y="396" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">ventas</text>
-          <text x="262" y="421" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="262" y="435" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK sucursal_id → sucursales</text>
-          <text x="262" y="449" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK cliente_id → clientes (NULL)</text>
-          <text x="262" y="463" font-family="Arial, sans-serif" font-size="9" fill="#555">canal_origen: ENUM(pos|web)</text>
-          <text x="262" y="477" font-family="Arial, sans-serif" font-size="9" fill="#555">estado: ENUM (7 estados)</text>
-          <text x="262" y="491" font-family="Arial, sans-serif" font-size="9" fill="#555">monto_total: DECIMAL(12,2)</text>
-          <text x="262" y="505" font-family="Arial, sans-serif" font-size="8" fill="#999">INDEX (sucursal, estado, created_at)</text>
+          <rect x="420" y="1010" width="320" height="140" rx="8" fill="#f3e5f5" stroke="#ce93d8" stroke-width="1.5"/>
+          <rect x="420" y="1010" width="320" height="24" rx="8" fill="#e1bee7" stroke="#ce93d8" stroke-width="1.5"/>
+          <text x="580" y="1026" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">ventas</text>
+          <text x="432" y="1051" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="432" y="1065" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK sucursal_id / FK cliente_id / FK tienda_id</text>
+          <text x="432" y="1079" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK usuario_id / FK sesion_caja_id</text>
+          <text x="432" y="1093" font-family="Arial, sans-serif" font-size="9" fill="#333">canal_origen: ENUM(pos | web)</text>
+          <text x="432" y="1107" font-family="Arial, sans-serif" font-size="9" fill="#333">estado: ENUM (7 estados)</text>
+          <text x="432" y="1121" font-family="Arial, sans-serif" font-size="9" fill="#333">monto_total: DECIMAL(12,2)</text>
+          <text x="432" y="1135" font-family="Arial, sans-serif" font-size="8" fill="#999">INDEX (sucursal_id, estado, created_at)</text>
 
           <!-- venta_detalle -->
-          <rect x="510" y="380" width="200" height="115" rx="8" fill="#fce4ec" stroke="#f48fb1" stroke-width="1.5"/>
-          <rect x="510" y="380" width="200" height="24" rx="8" fill="#f8bbd0" stroke="#f48fb1" stroke-width="1.5"/>
-          <text x="610" y="396" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">venta_detalle</text>
-          <text x="522" y="421" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="522" y="435" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK venta_id → ventas</text>
-          <text x="522" y="449" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK producto_variante_id → variantes</text>
-          <text x="522" y="463" font-family="Arial, sans-serif" font-size="9" fill="#555">cantidad: DECIMAL(12,3)</text>
-          <text x="522" y="477" font-family="Arial, sans-serif" font-size="9" fill="#555">precio_unitario: DECIMAL(12,2)</text>
-          <text x="522" y="491" font-family="Arial, sans-serif" font-size="8" fill="#999">subtotal: DECIMAL(12,2)</text>
+          <rect x="800" y="1010" width="320" height="105" rx="8" fill="#fce4ec" stroke="#f48fb1" stroke-width="1.5"/>
+          <rect x="800" y="1010" width="320" height="24" rx="8" fill="#f8bbd0" stroke="#f48fb1" stroke-width="1.5"/>
+          <text x="960" y="1026" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">venta_detalle</text>
+          <text x="812" y="1051" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="812" y="1065" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK venta_id → ventas</text>
+          <text x="812" y="1079" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK producto_variante_id → variantes</text>
+          <text x="812" y="1093" font-family="Arial, sans-serif" font-size="9" fill="#333">cantidad: DECIMAL(12,3)</text>
+          <text x="812" y="1107" font-family="Arial, sans-serif" font-size="9" fill="#333">precio_unitario / subtotal: DECIMAL</text>
 
-          <!-- ============================== ROW 4: STOCK ============================== -->
+          <!-- venta_pagos -->
+          <rect x="1180" y="1010" width="360" height="95" rx="8" fill="#fce4ec" stroke="#f48fb1" stroke-width="1.5"/>
+          <rect x="1180" y="1010" width="360" height="24" rx="8" fill="#f8bbd0" stroke="#f48fb1" stroke-width="1.5"/>
+          <text x="1360" y="1026" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">venta_pagos</text>
+          <text x="1192" y="1051" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="1192" y="1065" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK venta_id → ventas</text>
+          <text x="1192" y="1079" font-family="Arial, sans-serif" font-size="9" fill="#333">medio_pago: ENUM (5 medios)</text>
+          <text x="1192" y="1093" font-family="Arial, sans-serif" font-size="9" fill="#333">monto: DECIMAL(12,2)</text>
+
+          <!-- ================================================================
+               SECTION 5: STOCK Y SINCRONIZACIÓN
+               ================================================================ -->
+          <rect x="20" y="1240" width="1560" height="240" rx="14" fill="#e0f2f1" opacity="0.35"/>
+          <rect x="30" y="1252" width="180" height="26" rx="6" fill="#00695c" opacity="0.9"/>
+          <text x="120" y="1270" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#fff">Stock y Sincronización</text>
 
           <!-- stock_movimientos -->
-          <rect x="20" y="570" width="285" height="120" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
-          <rect x="20" y="570" width="285" height="24" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
-          <text x="162" y="586" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">stock_movimientos (Ledger)</text>
-          <text x="32" y="611" font-family="Arial, sans-serif" font-size="9" fill="#555">PK id: BIGINT</text>
-          <text x="32" y="625" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK sucursal_id → sucursales</text>
-          <text x="32" y="639" font-family="Arial, sans-serif" font-size="9" fill="#C33">FK producto_variante_id → variantes</text>
-          <text x="32" y="653" font-family="Arial, sans-serif" font-size="9" fill="#555">tipo_movimiento: ENUM (8 tipos)</text>
-          <text x="32" y="667" font-family="Arial, sans-serif" font-size="9" fill="#555">cantidad: DECIMAL(12,3) (±)</text>
-          <text x="32" y="681" font-family="Arial, sans-serif" font-size="8" fill="#999">INDEX (sucursal, variante, created_at)</text>
+          <rect x="40" y="1290" width="700" height="125" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
+          <rect x="40" y="1290" width="700" height="24" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
+          <text x="390" y="1306" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">stock_movimientos (Ledger — Fuente de verdad)</text>
+          <text x="52" y="1331" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="52" y="1345" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK sucursal_id (RESTRICT) / FK producto_variante_id (RESTRICT)</text>
+          <text x="52" y="1359" font-family="Arial, sans-serif" font-size="9" fill="#333">tipo_movimiento: ENUM (8 tipos)</text>
+          <text x="52" y="1373" font-family="Arial, sans-serif" font-size="9" fill="#333">cantidad: DECIMAL(12,3) (±) / FK tienda_id / FK venta_id / FK usuario_id</text>
+          <text x="52" y="1387" font-family="Arial, sans-serif" font-size="9" fill="#333">comentario: VARCHAR(255)</text>
+          <text x="52" y="1401" font-family="Arial, sans-serif" font-size="8" fill="#c33">INDEX compuesto: (sucursal_id, producto_variante_id, created_at)</text>
 
           <!-- stock_actual -->
-          <rect x="350" y="570" width="230" height="85" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
-          <rect x="350" y="570" width="230" height="24" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
-          <text x="465" y="586" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">stock_actual (caché)</text>
-          <text x="362" y="611" font-family="Arial, sans-serif" font-size="9" fill="#555">PK sucursal_id → sucursales</text>
-          <text x="362" y="625" font-family="Arial, sans-serif" font-size="9" fill="#555">PK producto_variante_id → variantes</text>
-          <text x="362" y="639" font-family="Arial, sans-serif" font-size="9" fill="#555">cantidad_disponible / reservada</text>
-          <text x="362" y="653" font-family="Arial, sans-serif" font-size="8" fill="#999">actualizado_at: TIMESTAMP</text>
+          <rect x="800" y="1290" width="320" height="90" rx="8" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1.5"/>
+          <rect x="800" y="1290" width="320" height="24" rx="8" fill="#c5cae9" stroke="#9fa8da" stroke-width="1.5"/>
+          <text x="960" y="1306" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">stock_actual (caché)</text>
+          <text x="812" y="1331" font-family="Arial, sans-serif" font-size="9" fill="#c33">PK (sucursal_id, producto_variante_id)</text>
+          <text x="812" y="1345" font-family="Arial, sans-serif" font-size="9" fill="#333">cantidad_disponible / cantidad_reservada</text>
+          <text x="812" y="1359" font-family="Arial, sans-serif" font-size="9" fill="#333">actualizado_at: TIMESTAMP</text>
 
-          <!-- ============================== RELATIONSHIPS ============================== -->
+          <!-- sync_eventos -->
+          <rect x="1180" y="1290" width="360" height="115" rx="8" fill="#e0f2f1" stroke="#80cbc4" stroke-width="1.5"/>
+          <rect x="1180" y="1290" width="360" height="24" rx="8" fill="#b2dfdb" stroke="#80cbc4" stroke-width="1.5"/>
+          <text x="1360" y="1306" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">sync_eventos</text>
+          <text x="1192" y="1331" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="1192" y="1345" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK tienda_id → tiendas</text>
+          <text x="1192" y="1359" font-family="Arial, sans-serif" font-size="9" fill="#333">entidad_tipo / entidad_id: INDEX</text>
+          <text x="1192" y="1373" font-family="Arial, sans-serif" font-size="9" fill="#333">direccion: ENUM(entrante|saliente)</text>
+          <text x="1192" y="1387" font-family="Arial, sans-serif" font-size="9" fill="#333">estado: ENUM / intentos: TINYINT</text>
+          <text x="1192" y="1401" font-family="Arial, sans-serif" font-size="8" fill="#999">payload: JSON + timestamps</text>
 
-          <!-- usuarios → roles (N:1) -->
-          <line x1="150" y1="55" x2="185" y2="55" stroke="#888" stroke-width="1" marker-end="url(#arrow-1n)"/>
-          <text x="167" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">N:1</text>
+          <!-- ================================================================
+               SECTION 6: AUDITORÍA Y REPORTES
+               ================================================================ -->
+          <rect x="20" y="1500" width="1560" height="190" rx="14" fill="#fce4ec" opacity="0.35"/>
+          <rect x="30" y="1512" width="190" height="26" rx="6" fill="#c62828" opacity="0.9"/>
+          <text x="125" y="1530" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#fff">Auditoría y Reportes</text>
 
-          <!-- usuarios ↔ sucursales via usuario_sucursal -->
-          <line x1="370" y1="100" x2="370" y2="160" stroke="#888" stroke-width="1"/>
-          <line x1="415" y1="100" x2="415" y2="160" stroke="#888" stroke-width="1"/>
-          <text x="392" y="138" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">N:M pivot</text>
+          <!-- auditoria_accesos -->
+          <rect x="40" y="1550" width="320" height="85" rx="8" fill="#fce4ec" stroke="#f48fb1" stroke-width="1.5"/>
+          <rect x="40" y="1550" width="320" height="24" rx="8" fill="#f8bbd0" stroke="#f48fb1" stroke-width="1.5"/>
+          <text x="200" y="1566" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">auditoria_accesos</text>
+          <text x="52" y="1591" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="52" y="1605" font-family="Arial, sans-serif" font-size="9" fill="#333">FK usuario_id (NULL) / entidad_tipo</text>
+          <text x="52" y="1619" font-family="Arial, sans-serif" font-size="9" fill="#333">entidad_id / accion / ip_origen</text>
 
-          <!-- sucursales → tiendas (1:N) -->
-          <line x1="595" y1="90" x2="640" y2="70" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
-          <text x="617" y="62" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <!-- resumen_ventas_diario -->
+          <rect x="420" y="1550" width="320" height="85" rx="8" fill="#fce4ec" stroke="#f48fb1" stroke-width="1.5"/>
+          <rect x="420" y="1550" width="320" height="24" rx="8" fill="#f8bbd0" stroke="#f48fb1" stroke-width="1.5"/>
+          <text x="580" y="1566" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">resumen_ventas_diario</text>
+          <text x="432" y="1591" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="432" y="1605" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK sucursal_id / fecha / canal_origen</text>
+          <text x="432" y="1619" font-family="Arial, sans-serif" font-size="9" fill="#333">total_ventas / cantidad_transacciones</text>
 
-          <!-- categorias → productos (1:N) -->
-          <line x1="100" y1="290" x2="280" y2="315" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
-          <text x="180" y="304" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <!-- resumen_stock_diario -->
+          <rect x="800" y="1550" width="320" height="85" rx="8" fill="#fce4ec" stroke="#f48fb1" stroke-width="1.5"/>
+          <rect x="800" y="1550" width="320" height="24" rx="8" fill="#f8bbd0" stroke="#f48fb1" stroke-width="1.5"/>
+          <text x="960" y="1566" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1a1a2e">resumen_stock_diario</text>
+          <text x="812" y="1591" font-family="Arial, sans-serif" font-size="9" fill="#333">PK id: BIGINT</text>
+          <text x="812" y="1605" font-family="Arial, sans-serif" font-size="9" fill="#c33">FK sucursal_id / FK producto_variante_id</text>
+          <text x="812" y="1619" font-family="Arial, sans-serif" font-size="9" fill="#333">cantidad_disponible / cantidad_reservada</text>
 
-          <!-- productos → producto_variantes (1:N) -->
-          <line x1="400" y1="270" x2="440" y2="270" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
-          <text x="420" y="263" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <!-- ================================================================
+               RELATIONSHIP LINES
+               ================================================================ -->
 
-          <!-- producto_variantes ↔ tiendas via producto_tienda_mapeo (N:M) -->
-          <line x1="630" y1="270" x2="670" y2="250" stroke="#888" stroke-width="1" stroke-dasharray="4,3"/>
-          <text x="650" y="238" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#888">N:M pivot</text>
+          <!-- roles 1:N usuarios -->
+          <path d="M 360 110 L 405 110" stroke="#666" stroke-width="1.2" fill="none" marker-end="url(#a-end)"/>
+          <text x="382" y="103" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#666">1:N</text>
 
-          <!-- producto_variantes → venta_detalle (1:N) -->
-          <line x1="535" y1="315" x2="600" y2="380" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
-          <text x="555" y="355" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <!-- usuarios → usuario_sucursal pivot → sucursales (N:M) -->
+          <path d="M 580 195 L 580 215" stroke="#666" stroke-width="1" fill="none"/>
+          <path d="M 860 195 L 860 215" stroke="#666" stroke-width="1" fill="none" marker-end="url(#a-end)"/>
+          <text x="720" y="208" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">N:M</text>
 
-          <!-- producto_variantes → stock_movimientos (1:N) -->
-          <line x1="470" y1="315" x2="220" y2="570" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
-          <text x="340" y="450" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <!-- sucursales 1:N tiendas -->
+          <path d="M 1120 132 L 1165 132" stroke="#666" stroke-width="1.2" fill="none" marker-end="url(#a-end)"/>
+          <text x="1142" y="124" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#666">1:N</text>
 
-          <!-- clientes → ventas (1:N) -->
-          <line x1="205" y1="450" x2="250" y2="450" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
-          <text x="227" y="442" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
-
-          <!-- ventas → venta_detalle (1:N) -->
-          <line x1="460" y1="475" x2="510" y2="445" stroke="#888" stroke-width="1.2" marker-end="url(#arrow-1n)"/>
-          <text x="485" y="460" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <!-- sucursales → sesiones_caja (1:N) -->
+          <path d="M 960 195 C 960 600, 200 600, 200 995" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="540" y="700" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
 
           <!-- sucursales → ventas (1:N) -->
-          <line x1="505" y1="135" x2="380" y2="380" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
-          <text x="460" y="260" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <path d="M 960 195 C 960 700, 580 700, 580 995" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="780" y="680" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
 
           <!-- sucursales → stock_movimientos (1:N) -->
-          <line x1="415" y1="125" x2="190" y2="570" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
-          <text x="370" y="340" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <path d="M 960 195 C 960 850, 390 850, 390 1275" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="700" y="840" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- categorias 1:N productos -->
+          <path d="M 360 372 L 405 372" stroke="#666" stroke-width="1.2" fill="none" marker-end="url(#a-end)"/>
+          <text x="382" y="364" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#666">1:N</text>
+
+          <!-- categorias → categoria_tienda_mapeo -->
+          <path d="M 200 415 L 200 435" stroke="#666" stroke-width="1" fill="none"/>
+          <text x="212" y="428" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- productos 1:N producto_variantes -->
+          <path d="M 740 387 L 785 387" stroke="#666" stroke-width="1.2" fill="none" marker-end="url(#a-end)"/>
+          <text x="762" y="379" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#666">1:N</text>
+
+          <!-- producto_variantes → producto_tienda_mapeo -->
+          <path d="M 960 445 L 960 465" stroke="#666" stroke-width="1" fill="none"/>
+          <text x="972" y="458" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- producto_variantes → venta_detalle (1:N) -->
+          <path d="M 960 445 C 960 750, 960 750, 960 995" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="972" y="780" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- producto_variantes → stock_movimientos (1:N) -->
+          <path d="M 850 445 C 850 900, 390 900, 390 1275" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="620" y="960" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- atributos 1:N valores_atributo -->
+          <path d="M 1360 405 L 1360 422" stroke="#666" stroke-width="1.2" fill="none" marker-end="url(#a-end)"/>
+          <text x="1372" y="415" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- valores_atributo → producto_variante_valores -->
+          <path d="M 1360 495 L 1360 515" stroke="#666" stroke-width="1" fill="none"/>
+          <text x="1372" y="508" font-family="Arial, sans-serif" font-size="7" font-style="italic" fill="#666">N:M via</text>
+
+          <!-- producto_variantes → producto_variante_valores -->
+          <path d="M 1120 410 C 1120 470, 1360 470, 1360 515" stroke="#666" stroke-width="1" fill="none"/>
+          <text x="1280" y="475" font-family="Arial, sans-serif" font-size="7" font-style="italic" fill="#666">N:M via</text>
+
+          <!-- tiendas → categoria_tienda_mapeo (1:N) -->
+          <path d="M 1180 120 C 1000 120, 200 120, 200 435" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="680" y="300" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- tiendas → producto_tienda_mapeo (1:N) -->
+          <path d="M 1180 145 C 1050 145, 960 145, 960 465" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="1100" y="330" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- tiendas → sync_eventos (1:N) -->
+          <path d="M 1360 195 L 1360 1275" stroke="#666" stroke-width="1.2" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="1372" y="800" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- tiendas → cliente_tienda_mapeo (1:N) -->
+          <path d="M 1180 165 C 1060 165, 580 165, 580 715" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="950" y="530" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- clientes → cliente_tienda_mapeo -->
+          <path d="M 360 750 L 405 750" stroke="#666" stroke-width="1" fill="none"/>
+          <text x="382" y="742" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- clientes → clientes_solicitudes_privacidad -->
+          <path d="M 360 775 L 785 775" stroke="#666" stroke-width="1" fill="none" marker-end="url(#a-end)"/>
+          <text x="572" y="767" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- clientes 1:N ventas -->
+          <path d="M 360 800 C 360 950, 580 950, 580 995" stroke="#666" stroke-width="1.2" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="472" y="920" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- sesiones_caja 1:N ventas -->
+          <path d="M 360 1055 L 405 1055" stroke="#666" stroke-width="1" fill="none"/>
+          <text x="382" y="1047" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
+
+          <!-- ventas 1:N venta_detalle -->
+          <path d="M 740 1070 L 785 1070" stroke="#666" stroke-width="1.2" fill="none" marker-end="url(#a-end)"/>
+          <text x="762" y="1062" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#666">1:N</text>
+
+          <!-- ventas 1:N venta_pagos -->
+          <path d="M 740 1095 C 820 1095, 1165 1095, 1165 1060" stroke="#666" stroke-width="1.2" fill="none" marker-end="url(#a-end)"/>
+          <text x="1000" y="1083" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#666">1:N</text>
 
           <!-- ventas → stock_movimientos (1:N) -->
-          <line x1="250" y1="480" x2="130" y2="570" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
-          <text x="185" y="530" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#888">1:N</text>
+          <path d="M 580 1150 C 580 1210, 250 1210, 250 1275" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="420" y="1230" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">1:N</text>
 
-          <!-- Logo / version -->
-          <text x="20" y="740" font-family="Arial, sans-serif" font-size="8" fill="#999">Diagrama ERD — POS + Inventario Multi-Sucursal — Refleja el modelo del Diccionario de Datos (28 tablas)</text>
-          <rect x="860" y="732" width="8" height="8" rx="2" fill="#e0f7fa" stroke="#80deea" stroke-width="1"/>
-          <text x="872" y="740" font-family="Arial, sans-serif" font-size="7" fill="#888"> Entidad</text>
-          <rect x="930" y="732" width="8" height="8" rx="2" fill="#fff" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
-          <text x="942" y="740" font-family="Arial, sans-serif" font-size="7" fill="#888"> Tabla Pivot</text>
+          <!-- stock_movimientos → stock_actual (alimenta) -->
+          <path d="M 740 1352 L 785 1352" stroke="#666" stroke-width="1.2" fill="none" marker-end="url(#a-end)"/>
+          <text x="762" y="1344" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#666">alimenta</text>
+
+          <!-- tiendas → ventas via FK (1:N) -->
+          <path d="M 1180 175 C 1050 175, 580 175, 580 995" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+
+          <!-- stock_actual → resumen_stock_diario (alimenta) -->
+          <path d="M 960 1380 L 960 1535" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="972" y="1470" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">alimenta</text>
+
+          <!-- ventas → resumen_ventas_diario (alimenta) -->
+          <path d="M 580 1150 C 580 1400, 580 1400, 580 1535" stroke="#666" stroke-width="1" fill="none" stroke-dasharray="6,4" marker-end="url(#a-end)"/>
+          <text x="592" y="1410" font-family="Arial, sans-serif" font-size="7.5" font-style="italic" fill="#666">alimenta</text>
+
+          <!-- ================================================================
+               LEGEND
+               ================================================================ -->
+          <rect x="20" y="1700" width="12" height="12" rx="2" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1"/>
+          <text x="36" y="1710" font-family="Arial, sans-serif" font-size="8" fill="#555">Entidad (tabla)</text>
+          <rect x="140" y="1700" width="12" height="12" rx="2" fill="#fff" stroke="#888" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="156" y="1710" font-family="Arial, sans-serif" font-size="8" fill="#555">Tabla pivote (N:M)</text>
+          <rect x="270" y="1700" width="12" height="12" rx="2" fill="#e8eaf6" stroke="#9fa8da" stroke-width="1" opacity="0.35"/>
+          <text x="286" y="1710" font-family="Arial, sans-serif" font-size="8" fill="#555">Fondo: módulo funcional</text>
+          <line x1="430" y1="1706" x2="490" y2="1706" stroke="#666" stroke-width="1.5" stroke-dasharray="6,4"/>
+          <text x="494" y="1710" font-family="Arial, sans-serif" font-size="8" fill="#555">Relación entre módulos</text>
+          <text x="660" y="1710" font-family="Arial, sans-serif" font-size="7.5" fill="#999">→ Desplaza lateral/vertical para ver las 28 tablas del modelo</text>
         </svg>
       </div>
 
       <h3>Leyenda de relaciones</h3>
       <table>
         <tr><th>Relación</th><th>Cardinalidad</th><th>Descripción</th></tr>
-        <tr><td>usuarios → roles</td><td>N:1</td><td>Cada usuario tiene exactamente un rol. La FK <code>rol_id</code> con RESTRICT impide borrar un rol con usuarios asignados.</td></tr>
+        <tr><td>usuarios → roles</td><td>N:1</td><td>Cada usuario tiene exactamente un rol. FK <code>rol_id</code> con RESTRICT impide borrar roles con usuarios asignados.</td></tr>
         <tr><td>usuarios ↔ sucursales</td><td>N:M</td><td>Un usuario opera en múltiples sucursales vía la pivote <code>usuario_sucursal</code>.</td></tr>
-        <tr><td>sucursales → tiendas</td><td>1:N</td><td>Una sucursal puede tener múltiples tiendas WooCommerce asociadas como canales de venta.</td></tr>
-        <tr><td>categorias → productos</td><td>1:N</td><td>Una categoría agrupa muchos productos. Soporta auto-referencia para subcategorías.</td></tr>
-        <tr><td>productos → producto_variantes</td><td>1:N</td><td>Un producto tiene una o más variantes vendibles. El SKU vive en la variante, no en el producto.</td></tr>
-        <tr><td>producto_variantes ↔ tiendas</td><td>N:M</td><td>Una variante se publica en múltiples tiendas WooCommerce vía la pivote <code>producto_tienda_mapeo</code>, cada una con su propio ID remoto.</td></tr>
-        <tr><td>producto_variantes → stock_movimientos</td><td>1:N</td><td>Cada movimiento del ledger afecta a una variante específica. Fuente de verdad del stock.</td></tr>
-        <tr><td>sucursales → stock_movimientos</td><td>1:N</td><td>Todo movimiento de stock está asociado a una sucursal (no hay stock global).</td></tr>
-        <tr><td>clientes → ventas</td><td>1:N</td><td>Un cliente puede tener múltiples ventas en su historial.</td></tr>
-        <tr><td>ventas → venta_detalle</td><td>1:N</td><td>Cada venta tiene una o más líneas de detalle con precios históricos inmutables.</td></tr>
-        <tr><td>ventas → stock_movimientos</td><td>1:N</td><td>Una venta genera movimientos de salida en el ledger (descuento de stock).</td></tr>
+        <tr><td>sucursales → tiendas</td><td>1:N</td><td>Una sucursal puede tener múltiples tiendas WooCommerce como canales de venta.</td></tr>
+        <tr><td>sucursales → sesiones_caja</td><td>1:N</td><td>Cada sesión de caja pertenece a una sucursal.</td></tr>
         <tr><td>sucursales → ventas</td><td>1:N</td><td>Cada venta pertenece a la sucursal que la despachó.</td></tr>
+        <tr><td>sucursales → stock_movimientos</td><td>1:N</td><td>Todo movimiento de stock está asociado a una sucursal (no hay stock global).</td></tr>
+        <tr><td>categorias → productos</td><td>1:N</td><td>Una categoría agrupa muchos productos. Soporta auto-referencia para subcategorías.</td></tr>
+        <tr><td>categorias ↔ tiendas</td><td>N:M</td><td>Una categoría se mapea a categorías remotas en cada tienda Woo (pivote <code>categoria_tienda_mapeo</code>).</td></tr>
+        <tr><td>productos → producto_variantes</td><td>1:N</td><td>Un producto tiene una o más variantes vendibles. El SKU vive en la variante, no en el producto.</td></tr>
+        <tr><td>producto_variantes ↔ tiendas</td><td>N:M</td><td>Una variante se publica en múltiples tiendas WooCommerce vía <code>producto_tienda_mapeo</code>.</td></tr>
+        <tr><td>atributos → valores_atributo</td><td>1:N</td><td>Un atributo (Color, Talla) tiene múltiples valores (Rojo, M, etc.).</td></tr>
+        <tr><td>producto_variantes ↔ valores_atributo</td><td>N:M</td><td>Una variante se define por una combinación de valores de atributo vía <code>producto_variante_valores</code>.</td></tr>
+        <tr><td>producto_variantes → venta_detalle</td><td>1:N</td><td>Las líneas de venta referencian variantes específicas con precios históricos.</td></tr>
+        <tr><td>producto_variantes → stock_movimientos</td><td>1:N</td><td>Cada movimiento del ledger afecta a una variante. Fuente de verdad del stock.</td></tr>
+        <tr><td>clientes → cliente_tienda_mapeo</td><td>1:N</td><td>Un cliente se mapea a su equivalente en cada tienda Woo via pivote.</td></tr>
+        <tr><td>clientes → clientes_solicitudes_privacidad</td><td>1:N</td><td>Un cliente puede ejercer múltiples derechos ARCO+ (Ley 21.719).</td></tr>
+        <tr><td>clientes → ventas</td><td>1:N</td><td>Un cliente puede tener múltiples ventas en su historial.</td></tr>
+        <tr><td>sesiones_caja → ventas</td><td>1:N</td><td>Cada venta ocurre dentro de una sesión de caja abierta.</td></tr>
+        <tr><td>ventas → venta_detalle</td><td>1:N</td><td>Cada venta tiene una o más líneas de detalle con precios históricos inmutables.</td></tr>
+        <tr><td>ventas → venta_pagos</td><td>1:N</td><td>Una venta puede tener múltiples medios de pago (soporta pagos mixtos).</td></tr>
+        <tr><td>ventas → stock_movimientos</td><td>1:N</td><td>Una venta genera movimientos de salida en el ledger (descuento de stock).</td></tr>
+        <tr><td>ventas → resumen_ventas_diario</td><td>alimenta</td><td>El cron de reportes agrega ventas diarias a esta tabla pre-agregada.</td></tr>
+        <tr><td>stock_movimientos → stock_actual</td><td>alimenta</td><td>Al insertar un movimiento, se recalcula incrementalmente el caché de stock actual.</td></tr>
+        <tr><td>stock_actual → resumen_stock_diario</td><td>alimenta</td><td>Snapshot diario del stock para análisis de tendencia.</td></tr>
+        <tr><td>tiendas → sync_eventos</td><td>1:N</td><td>Todo evento de sincronización (entrante/saliente) se registra contra una tienda.</td></tr>
+        <tr><td>tiendas → ventas</td><td>1:N</td><td>Una venta web se asocia a la tienda WooCommerce de origen.</td></tr>
       </table>
-      <p class="note" style="font-size:0.8rem;color:#666;margin-top:0.5rem;">Para la especificación completa de campos, tipos, nulabilidad e índices, consulta la sección <a href="#arquitectura-diccionario">Diccionario de Datos — Esquema MariaDB</a>.</p>
+      <p class="note" style="font-size:0.8rem;color:#666;margin-top:0.5rem;">Las 28 tablas del sistema están representadas. Las tablas pivote (N:M) se muestran con bordes discontinuos. Los fondos de color agrupan tablas por módulo funcional. Consulta el <a href="#arquitectura-diccionario">Diccionario de Datos</a> para la especificación completa de campos, tipos e índices.</p>
     </article>
 
     <!-- ================================================================ -->
@@ -1434,7 +1792,7 @@ public function handle()
       <p class="lead">Los pedidos web importados desde WooCommerce requieren asignación a una sucursal para su preparación y despacho. El MVP soporta dos modos de asignación, y un tercero queda en backlog.</p>
 
       <h3>Modo A: Sucursal fija / Bodega central</h3>
-      <p><strong>Configuración:</strong> Todo pedido web se asigna automáticamente a una sucursal específica (la "bodega central" o "sucursal de despacho") configurada en el CanalWoo.</p>
+      <p><strong>Configuración:</strong> Todo pedido web se asigna automáticamente a una sucursal específica (la "bodega central" o "sucursal de despacho") configurada en el <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">CanalWoo</a>.</p>
       <p><strong>Cuándo usarlo:</strong> Clientes con una sola sucursal operativa que centraliza todos los despachos, o clientes que tercerizan la logística y solo necesitan consolidar pedidos en un punto.</p>
       <p><strong>Implementación:</strong> El campo <code>canal_woos.branch_id</code> se usa como sucursal de despacho default. No hay intervención manual.</p>
 
@@ -1467,7 +1825,7 @@ public function handle()
       <p>Cada cambio de estado en el POS actualiza el estado del pedido en WooCommerce mediante la API REST y, opcionalmente, agrega una nota privada visible para el administrador de la tienda.</p>
 
       <div class="warn-box">
-        <strong>MVP vs futuro:</strong> En el MVP, las rutas de despacho se gestionan manualmente (Modo A o B). La integración con servicios externos de tracking (Chilexpress, Starken, Bluexpress) queda para fases posteriores.
+        <strong>MVP vs futuro:</strong> En el <a href="#" data-page="vision-general-alcance-mvp" onclick="location.hash='vision-general-alcance-mvp';return false;">MVP</a>, las rutas de despacho se gestionan manualmente (Modo A o B). La integración con servicios externos de tracking (Chilexpress, Starken, Bluexpress) queda para fases posteriores.
       </div>
     </article>
 
@@ -1623,7 +1981,7 @@ public function requestForget(Customer \$customer)
       <h3>Implementación técnica</h3>
       <p>Usamos <code>spatie/laravel-permission</code> con una adaptación multi-sucursal:</p>
       <ul>
-        <li>Los roles se asignan a un usuario <strong>en relación con una sucursal</strong> mediante la tabla pivot <code>model_branch_roles</code> (user_id, role_id, branch_id).</li>
+        <li>Los roles se asignan a un usuario <strong>en relación con una <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">sucursal</a></strong> mediante la tabla pivot <code>model_branch_roles</code> (user_id, role_id, branch_id).</li>
         <li>El middleware <code>CheckBranchAccess</code> verifica que el usuario tenga el rol requerido en la sucursal activa de la sesión.</li>
         <li>Los permisos globales (Admin Central) se asignan sin sucursal (branch_id = null).</li>
         <li>Para la jerarquía acumulativa, se usa un <code>RoleHierarchyService</code> que permite a un rol ejecutar Gates definidos para roles inferiores.</li>
@@ -1682,7 +2040,7 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
         <li><strong>Compatibilidad con Laravel (PHP):</strong> El SDK de Transbank es para Java/.NET. Habría que crear un bridge (ej. microservicio en Node.js o contenedor Java) que se comunique con Laravel vía socket local o API HTTP.</li>
         <li><strong>Certificación:</strong> Transbank exige certificación para cada integración. El proceso puede tomar 2-4 semanas.</li>
         <li><strong>Multi-plataforma:</strong> El POS corre en navegador (cualquier SO), pero el bridge con el terminal POS es dependiente del SO del operador.</li>
-        <li><strong>Sin demonios en cPanel:</strong> El bridge sería un proceso externo que debe ejecutarse en la máquina del operador, no en el servidor.</li>
+        <li><strong>Sin demonios en <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a>:</strong> El bridge sería un proceso externo que debe ejecutarse en la máquina del operador, no en el servidor.</li>
       </ul>
 
       <h3>Arquitectura propuesta (futura)</h3>
@@ -1722,7 +2080,7 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
       <ul>
         <li><strong>¿Se factura desde el POS o desde WooCommerce?</strong> Opción A: El POS emite la boleta/factura al momento de la venta presencial. Opción B: WooCommerce emite los DTE de pedidos web. Lo ideal sería ambos, pero duplica la integración.</li>
         <li><strong>¿Timing de emisión?</strong> Inmediata (al pagar) vs. diferida (al despachar). La ley permite ambas, pero la inmediata es mejor para el cliente.</li>
-        <li><strong>¿Múltiples sucursales con un solo RUT?</strong> Si el cliente tiene un RUT para todas las sucursales, los DTE se emiten con ese RUT pero deben identificar la sucursal emisora en el detalle.</li>
+        <li><strong>¿Múltiples <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">sucursales</a> con un solo RUT?</strong> Si el cliente tiene un RUT para todas las sucursales, los DTE se emiten con ese RUT pero deben identificar la sucursal emisora en el detalle.</li>
         <li><strong>¿RUT de cliente obligatorio?</strong> Para boletas no es obligatorio; para facturas sí. El POS debe manejar ambos flujos.</li>
       </ul>
 
@@ -1850,7 +2208,7 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
       </ul>
 
       <h3>Beneficio para migraciones futuras</h3>
-      <p>Si el negocio crece y se decide extraer la sincronización a un microservicio independiente, el directorio <code>app/Domain/Sync/</code> se copia a un nuevo proyecto Laravel con cambios mínimos. Las <code>Actions</code> y <code>Jobs</code> ya están encapsuladas; solo hay que reemplazar el <code>WooCommerceApiClient</code> por llamadas HTTP al nuevo servicio. El resto del sistema (Inventory, Sales, Identity) ni se entera del cambio.</p>
+      <p>Si el negocio crece y se decide extraer la sincronización a un microservicio independiente, el directorio <code>app/Domain/Sync/</code> se copia a un nuevo proyecto Laravel con cambios mínimos. Las <code>Actions</code> y <code>Jobs</code> ya están encapsuladas; solo hay que reemplazar el <code><a href="#" data-page="backend-guide-servicios" onclick="location.hash='backend-guide-servicios';return false;">WooCommerceApiClient</a></code> por llamadas HTTP al nuevo servicio. El resto del sistema (Inventory, Sales, Identity) ni se entera del cambio.</p>
 
       <blockquote>
         <strong>Consejo para el desarrollador:</strong> No te sientas obligado a crear todas las carpetas de una vez. Empieza con <code>Domain/Sales</code> para el POS y <code>Domain/Inventory</code> para el stock. A medida que el código crezca, extraé <code>Domain/Sync</code> y <code>Domain/Reporting</code>. La estructura debe evolucionar con el sistema, no definirse rígidamente el día cero.
@@ -1864,7 +2222,7 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
       <p class="lead">Regla de oro: prohibido calcular reportes en tiempo real sobre tablas transaccionales. El rendimiento del POS es la prioridad máxima; la latencia en reportes es una decisión de diseño aceptada.</p>
 
       <div class="warn-box">
-        <strong>Riesgo crítico:</strong> Una consulta <code>SELECT SUM(quantity) FROM stock_ledger WHERE ...</code> sobre 500k movimientos mientras un cajero intenta cobrar en el POS puede congelar la base de datos compartida de cPanel. La pre-agregación no es optativa: es obligatoria para la viabilidad del sistema en producción.
+        <strong>Riesgo crítico:</strong> Una consulta <code>SELECT SUM(quantity) FROM stock_ledger WHERE ...</code> sobre 500k movimientos mientras un cajero intenta cobrar en el POS puede congelar la base de datos compartida de <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a>. La pre-agregación no es optativa: es obligatoria para la viabilidad del sistema en producción.
       </div>
 
       <h3>Estrategia de pre-agregación</h3>
@@ -1947,7 +2305,7 @@ public function handle(): void
 45 23 * * * /usr/local/bin/php /home/user/public_html/artisan reports:close-day >> /dev/null 2>&amp;1</pre>
 
       <h3>Latencia como decisión de diseño</h3>
-      <p>El panel de reportes del MVP muestra datos con una latencia de hasta 60 minutos. Esto es intencional. El cajero no puede esperar a que una consulta pesada termine para completar una venta. El administrador que revisa reportes puede tolerar datos de "hace 30 minutos".</p>
+      <p>El panel de reportes del <a href="#" data-page="vision-general-alcance-mvp" onclick="location.hash='vision-general-alcance-mvp';return false;">MVP</a> muestra datos con una latencia de hasta 60 minutos. Esto es intencional. El cajero no puede esperar a que una consulta pesada termine para completar una venta. El administrador que revisa reportes puede tolerar datos de "hace 30 minutos".</p>
       <p>Si en Fase 2 se requiere reportes en tiempo real, se implementa una capa de caché (Redis si el hosting lo soporta, o tabla denormalizada <code>branch_product_stock</code>) que se actualiza mediante eventos de dominio, no por consultas directas al ledger.</p>
 
       <blockquote>
@@ -1983,7 +2341,7 @@ public function handle(): void
       <p><strong>Situación en el MVP:</strong> El sistema emite un comprobante interno (ticket o comprobante no tributario) al finalizar cada venta. Este comprobante cumple como respaldo de la operación pero <strong>no tiene validez fiscal</strong>.</p>
       <p><strong>Por qué no está en el MVP:</strong></p>
       <ul>
-        <li><strong>Obligación legal vs complejidad técnica:</strong> Emitir DTE requiere integración con el SII (SOAP XML con firma electrónica) o con un proveedor autorizado (PayMe, LibreDTE, Haulmer). Cada proveedor tiene su propia API, modelo de datos y costos asociados.</li>
+        <li><strong>Obligación legal vs complejidad técnica:</strong> Emitir <a href="#" data-page="preguntas-facturacion-dte" onclick="location.hash='preguntas-facturacion-dte';return false;">DTE</a> requiere integración con el <a href="#" data-page="preguntas-facturacion-dte" onclick="location.hash='preguntas-facturacion-dte';return false;">SII</a> (SOAP XML con firma electrónica) o con un proveedor autorizado (PayMe, LibreDTE, Haulmer). Cada proveedor tiene su propia API, modelo de datos y costos asociados.</li>
         <li><strong>Decisión de proveedor pendiente:</strong> El cliente debe elegir el proveedor de facturación. No es una decisión técnica sino comercial. El desarrollador no debe forzar una elección en el MVP.</li>
         <li><strong>Múltiples flujos:</strong> Boleta electrónica (sin RUT) vs factura electrónica (con RUT). Notas de crédito/débito. Cada flujo duplica la lógica de integración.</li>
       </ul>
@@ -2000,7 +2358,7 @@ public function handle(): void
       </div>
 
       <h3>3. Modo Offline (PWA / IndexedDB)</h3>
-      <p><strong>Situación en el MVP:</strong> El POS requiere conexión continua al servidor (cPanel). Cada transacción se registra mediante Inertia.js hacia Laravel. Si la conexión se pierde, el POS deja de operar.</p>
+      <p><strong>Situación en el MVP:</strong> El POS requiere conexión continua al servidor (<a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a>). Cada transacción se registra mediante <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Inertia.js</a> hacia Laravel. Si la conexión se pierde, el POS deja de operar.</p>
       <p><strong>Por qué no está en el MVP:</strong></p>
       <ul>
         <li><strong>Complejidad de sincronización bidireccional:</strong> Implementar un caché local (IndexedDB en el navegador) que almacene transacciones offline y las sincronice al reconectar requiere un motor de conflictos, detección de cambios, y lógica de reconciliación que duplica gran parte del backend en el frontend.</li>
@@ -2020,7 +2378,7 @@ public function handle(): void
       </div>
 
       <h3>4. Enrutamiento Geográfico (Modo C — Despacho)</h3>
-      <p><strong>Situación en el MVP:</strong> Los pedidos web se asignan a sucursal mediante Modo A (sucursal fija del CanalWoo) o Modo B (selección manual por supervisor). No hay asignación automática por geolocalización.</p>
+      <p><strong>Situación en el MVP:</strong> Los pedidos web se asignan a sucursal mediante Modo A (sucursal fija del <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">CanalWoo</a>) o Modo B (selección manual por supervisor). No hay asignación automática por geolocalización.</p>
       <p><strong>Por qué no está en el MVP:</strong> Ver sección <a href="#ventas-rutas-despacho" onclick="showPage('ventas-rutas-despacho')">5.1 Rutas de Despacho</a>. Requiere mantener una base de datos de comunas, tabla de cobertura por sucursal, lógica de excepción por falta de stock, y validación de direcciones. Es deseable pero no crítico para la operación inicial.</p>
       <p><strong>Alcance conceptual para Fase 2:</strong></p>
       <ul>
@@ -2033,7 +2391,7 @@ public function handle(): void
       <h3>5. Integración con servicios de tracking (Chilexpress, Starken, Bluexpress)</h3>
       <p><strong>Situación en el MVP:</strong> No hay tracking externo. El estado de despacho se actualiza manualmente en el POS y se refleja en WooCommerce.</p>
       <p><strong>Por qué no está en el MVP:</strong> Cada courier tiene su propia API de tracking con distintos formatos y requerimientos de autenticación. La integración es puramente operativa y no afecta la transaccionalidad del negocio.</p>
-      <p><strong>Alcance conceptual para Fase 2:</strong> Tabla <code>shipping_providers</code> con configuración de API por courier. Webhook receptor para actualizar estado automáticamente cuando el courier escanea el paquete.</p>
+      <p><strong>Alcance conceptual para Fase 2:</strong> Tabla <code>shipping_providers</code> con configuración de API por courier. <a href="#" data-page="sincronizacion-webhooks" onclick="location.hash='sincronizacion-webhooks';return false;">Webhook</a> receptor para actualizar estado automáticamente cuando el courier escanea el paquete.</p>
 
       <h3>Resumen visual: MVP vs Fase 2</h3>
       <table>
@@ -2050,12 +2408,12 @@ public function handle(): void
     </article>
 
     <!-- ================================================================ -->
-    <!--  SECCIÓN 10: GUÍA DE DESARROLLO                                  -->
+    <!--  SECCIÓN 10: GUÍA DE FRONTEND                                    -->
     <!-- ================================================================ -->
 
     <!-- 10.1 Especificaciones de Frontend (Vue 3 + Inertia) -->
-    <article class="page" id="guia-frontend">
-      <div class="section-id">10 · Guía de Desarrollo</div>
+    <article class="page" id="frontend-guide-vue">
+      <div class="section-id">10 · Guía de Frontend</div>
       <h2>Frontend: Vue 3 + Inertia</h2>
       <p class="lead">Directrices para construir la interfaz del sistema, con énfasis en el módulo de Caja (POS), que es la pantalla más crítica en términos de reactividad y experiencia de usuario.</p>
 
@@ -2103,7 +2461,7 @@ export const usePosCartStore = defineStore('pos-cart', {
 })</pre>
 
       <div class="warn-box">
-        <strong>Regla estricta:</strong> El store de Pinia <strong>solo</strong> se usa para el carrito del POS. Cualquier otro estado global (usuario logueado, sucursal activa, preferencias) se obtiene de las props de Inertia o de la sesión de Laravel a través de <code>usePage()</code>. Si un desarrollador nuevo crea un store de Pinia para productos o sucursales, la PR debe rechazarse.
+        <strong>Regla estricta:</strong> El store de Pinia <strong>solo</strong> se usa para el carrito del POS. Cualquier otro estado global (usuario logueado, sucursal activa, preferencias) se obtiene de las props de Inertia o de la sesión de Laravel a través de <code>usePage()</code>. Si un desarrollador nuevo crea un store de Pinia para productos o <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">sucursales</a>, la PR debe rechazarse.
       </div>
 
       <h3>Lectura de Código de Barras</h3>
@@ -2212,9 +2570,362 @@ export function useBarcodeScanner() {
       </blockquote>
     </article>
 
-    <!-- 10.2 Hoja de Ruta de Desarrollo -->
-    <article class="page" id="guia-hoja-ruta">
-      <div class="section-id">10 · Guía de Desarrollo</div>
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 11: GUÍA DE BACKEND                                     -->
+    <!-- ================================================================ -->
+
+    <!-- 11.1 Motor de Colas y Cron -->
+    <article class="page" id="backend-guide-queues">
+      <div class="section-id">11 · Guía de Backend</div>
+      <h2>Motor de Colas y Cron</h2>
+      <p class="lead">El sistema no tiene demonios persistentes. Toda la ejecución diferida se apoya en dos pilares: el driver de colas <code>database</code> de Laravel y el programador de tareas (cron) de cPanel. Este patrón es obligatorio, no optativo.</p>
+
+      <div class="warn-box">
+        <strong>Restricción de infraestructura:</strong> <a href="#" data-page="arquitectura-infraestructura" onclick="location.hash='arquitectura-infraestructura';return false;">cPanel</a> no permite ejecutar <code>php artisan queue:work</code> como servicio (sin systemd, supervisor, screen/tmux). La combinación cron + DB queue es la única alternativa viable en hosting compartido.
+      </div>
+
+      <h3>Pipeline de ejecución diferida</h3>
+      <ol>
+        <li><strong>Dispatch:</strong> El controlador (o Action) despacha un Job con <code>dispatch()->onQueue('high')</code>. La operación POS no espera a que el Job termine.</li>
+        <li><strong>Persistencia:</strong> El Job se almacena en la tabla <code>jobs</code> de MySQL (driver <code>database</code>). No hay Redis ni memoria volátil.</li>
+        <li><strong>Trigger:</strong> Cada minuto, el cron ejecuta <code>php artisan queue:work --stop-when-empty</code>. Este comando procesa todos los Jobs pendientes y luego termina.</li>
+        <li><strong>Ejecución:</strong> Los Jobs se procesan en orden de prioridad: <code>high</code> (stock), <code>normal</code> (productos, transferencias), <code>low</code> (clientes). Dentro de cada cola, FIFO.</li>
+        <li><strong>Finalización:</strong> Al vaciar la cola, el worker se detiene. No queda ningún proceso residente. El próximo minuto, el cron lo vuelve a iniciar.</li>
+      </ol>
+
+      <h3>Reintentos y resiliencia</h3>
+      <table>
+        <tr><th>Mecanismo</th><th>Configuración</th></tr>
+        <tr><td>Reintentos con backoff</td><td>5 intentos: 30s, 2min, 5min, 15min, 30min</td></tr>
+        <tr><td>Dead Letter Queue</td><td>Jobs fallidos pasan a <code>failed_jobs</code>. Se recuperan con <code>php artisan sync:retry-all</code></td></tr>
+        <tr><td>Idempotencia</td><td>UUID en header <code>X-Idempotency-Key</code>. WooCommerce lo almacena 24h para evitar duplicados</td></tr>
+        <tr><td>Throttling</td><td>Middleware <code>throttle</code> de Laravel HTTP Client + semáforo por CanalWoo (25 req/s)</td></tr>
+      </table>
+
+      <h3>Jobs del sistema y su programación cron</h3>
+      <table>
+        <tr><th>Job / Comando</th><th>Frecuencia</th><th>Cola</th></tr>
+        <tr><td><code>SyncStockToWooCommerce</code></td><td>Al descuadrar stock (evento)</td><td>high</td></tr>
+        <tr><td><code>SyncProductToWooCommerce</code></td><td>Al crear/actualizar producto</td><td>normal</td></tr>
+        <tr><td><code>SyncTransferToWooCommerce</code></td><td>Al completar transferencia</td><td>normal</td></tr>
+        <tr><td><code>SyncCustomerToWooCommerce</code></td><td>Al crear/actualizar cliente</td><td>low</td></tr>
+        <tr><td><code>SyncPriceToWooCommerce</code></td><td>Al cambiar precio</td><td>normal</td></tr>
+        <tr><td><code>php artisan sync:reconcile-stock</code></td><td>03:00 AM (diario)</td><td>— (comando directo)</td></tr>
+        <tr><td><code>php artisan reports:aggregate-sales</code></td><td>Cada 30-60 min</td><td>— (comando directo)</td></tr>
+        <tr><td><code>php artisan stock:snapshot</code></td><td>Cada 15-30 min</td><td>— (comando directo)</td></tr>
+        <tr><td><code>php artisan reports:close-day</code></td><td>23:45 (diario)</td><td>— (comando directo)</td></tr>
+      </table>
+
+      <h3>Entradas de cron en cPanel</h3>
+      <pre># Worker de cola — cada minuto
+* * * * * /usr/local/bin/php /home/user/public_html/artisan queue:work --stop-when-empty --queue=high,normal,low >> /dev/null 2>&1
+
+# Reconciliación diaria de stock — 03:00 AM
+0 3 * * * /usr/local/bin/php /home/user/public_html/artisan sync:reconcile-stock >> /dev/null 2>&1
+
+# Reportes — cada 30 minutos
+*/30 * * * * /usr/local/bin/php /home/user/public_html/artisan reports:aggregate-sales >> /dev/null 2>&1
+
+# Snapshots de stock — cada 15 minutos
+*/15 * * * * /usr/local/bin/php /home/user/public_html/artisan stock:snapshot >> /dev/null 2>&1
+
+# Cierre diario — 23:45
+45 23 * * * /usr/local/bin/php /home/user/public_html/artisan reports:close-day >> /dev/null 2>&1</pre>
+
+      <div class="info-box">
+        <strong>Latencia aceptada:</strong> La ventana de inconsistencia máxima del sistema es de ~1 minuto en condiciones normales (el intervalo del cron). Los reportes pueden tener hasta 60 min de rezago. Toda transacción POS se completa en &lt;500ms porque nunca espera a WooCommerce.
+      </div>
+    </article>
+
+    <!-- 11.2 Servicios Transversales -->
+    <article class="page" id="backend-guide-servicios">
+      <div class="section-id">11 · Guía de Backend</div>
+      <h2>Servicios Transversales</h2>
+      <p class="lead">Componentes de infraestructura que no pertenecen a un dominio específico pero son necesarios para la operación del sistema. Se definen por contrato (interface) y se inyectan por binding en el contenedor de Laravel.</p>
+
+      <h3>LicenseValidator</h3>
+      <p><strong>Propósito:</strong> Validar la licencia de la instalación. En el <a href="#" data-page="vision-general-alcance-mvp" onclick="location.hash='vision-general-alcance-mvp';return false;">MVP</a> siempre retorna activo para no bloquear al desarrollador ni al cliente durante la fase inicial.</p>
+      <pre>interface LicenseValidator {
+    public function isValid(string $licenseKey): bool;
+    public function getLicenseInfo(string $licenseKey): array;
+    public function getDaysRemaining(string $licenseKey): ?int;
+}</pre>
+      <p>Implementación MVP (<code>LocalLicenseStub</code>):</p>
+      <pre>class LocalLicenseStub implements LicenseValidator {
+    public function isValid(string $licenseKey): bool { return true; }
+    public function getLicenseInfo(string $licenseKey): array {
+        return [
+            'status' => 'active',
+            'plan'   => 'mvp-standalone',
+            'source' => 'stub',
+        ];
+    }
+    public function getDaysRemaining(string $licenseKey): ?int { return 365; }
+}</pre>
+      <p><strong>Reemplazo futuro:</strong> Solo se cambia el binding en <code>AppServiceProvider</code> para apuntar a un servicio cloud real. El dominio no conoce ni depende de la implementación concreta.</p>
+      <pre>// MVP:
+$this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
+// Futuro:
+// $this->app->bind(LicenseValidator::class, CloudLicenseService::class);</pre>
+
+      <h3>RoleHierarchyService</h3>
+      <p><strong>Propósito:</strong> Implementar la jerarquía acumulativa de roles (<a href="#" data-page="cumplimiento-roles" onclick="location.hash='cumplimiento-roles';return false;">Cajero</a> → Supervisor → Admin Central). Un rol puede ejecutar Gates definidos para roles inferiores sin necesidad de asignar múltiples roles al mismo usuario.</p>
+      <pre>class RoleHierarchyService {
+    private array $hierarchy = [
+        'cajero'        => 1,
+        'supervisor'    => 2,
+        'admin_central' => 3,
+    ];
+
+    public function hasMinimumRole(User $user, string $requiredRole, ?Branch $branch = null): bool {
+        $userLevel = $this->getUserLevel($user, $branch);
+        $requiredLevel = $this->hierarchy[$requiredRole] ?? 0;
+        return $userLevel >= $requiredLevel;
+    }
+
+    public function getUserLevel(User $user, ?Branch $branch): int {
+        $roleName = $user->getRoleForBranch($branch);
+        return $this->hierarchy[$roleName] ?? 0;
+    }
+}</pre>
+
+      <h3>WooCommerceApiClient</h3>
+      <p><strong>Propósito:</strong> Cliente HTTP reutilizable para la API REST de WooCommerce. Encapsula autenticación (Consumer Key + Consumer Secret), throttling y manejo de errores. Vive en <code>Domain/Sync/Clients/</code>.</p>
+      <ul>
+        <li>Autenticación por <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">CanalWoo</a>: cada tienda tiene sus propias credenciales cifradas en la tabla <code>tiendas</code>.</li>
+        <li>Throttling: middleware <code>throttle</code> de Laravel HTTP Client respetando 25 req/s por canal.</li>
+        <li>Manejo de errores: lanza excepciones tipadas (<code>WooCommerceConnectionException</code>, <code>WooCommerceAuthException</code>, <code>WooCommerceRateLimitException</code>) para que los Jobs las capturen y reintenten según la política de backoff.</li>
+      </ul>
+
+      <h3>Conflict Resolvers (Sync)</h3>
+      <p>Dos estrategias de resolución de conflictos para el catálogo, definidas en <code>Domain/Sync/Rules/</code>:</p>
+      <table>
+        <tr><th>Resolvedor</th><th>Estrategia</th><th>Ubicación</th></tr>
+        <tr><td><code>TimestampConflictResolver</code></td><td>Gana el <code>updated_at</code> más reciente. Simple pero vulnerable a skew de reloj (&gt;5s).</td><td><code>Domain/Sync/Rules/</code></td></tr>
+        <tr><td><code>FieldOwnershipResolver</code></td><td>Cada campo tiene dueño (sku, price → POS; description, images → WooCommerce). Nunca se sobreescribe un campo cuyo origen es el otro sistema.</td><td><code>Domain/Sync/Rules/</code></td></tr>
+      </table>
+    </article>
+
+    <!-- 11.3 Middleware y Seguridad en Rutas -->
+    <article class="page" id="backend-guide-middleware">
+      <div class="section-id">11 · Guía de Backend</div>
+      <h2>Middleware y Seguridad en Rutas</h2>
+      <p class="lead">Dos middleware protegen los puntos de entrada del sistema: uno valida que el usuario tenga permiso para operar en una sucursal específica, y otro verifica que los webhooks entrantes sean legítimos.</p>
+
+      <h3>CheckBranchAccess</h3>
+      <p><strong>Propósito:</strong> Verificar que el usuario autenticado tenga el rol requerido en la sucursal activa de la sesión antes de ejecutar una acción. Se aplica a todas las rutas de negocio que dependen de una sucursal.</p>
+      <pre>class CheckBranchAccess {
+    public function handle(Request $request, Closure $next, string $requiredRole): Response {
+        $user = $request->user();
+        $branch = $request->route('branch') ?? session('active_branch');
+
+        if (!$user || !$branch) {
+            abort(403, 'No hay sucursal activa.');
+        }
+
+        // El RoleHierarchyService valida jerarquía acumulativa
+        if (!app(RoleHierarchyService::class)->hasMinimumRole($user, $requiredRole, $branch)) {
+            abort(403, 'No tienes permiso en esta sucursal.');
+        }
+
+        // Vincular sucursal a la request para acciones posteriores
+        $request->merge(['active_branch' => $branch]);
+        return $next($request);
+    }
+}</pre>
+
+      <p><strong>Uso en rutas:</strong></p>
+      <pre>Route::middleware(['auth', 'branch-access:supervisor'])->group(function () {
+    Route::post('/stock/adjust', [StockController::class, 'adjust']);
+    Route::post('/stock/transfer', [StockController::class, 'transfer']);
+});
+
+Route::middleware(['auth', 'branch-access:cajero'])->group(function () {
+    Route::post('/pos/sale', [PosController::class, 'store']);
+});</pre>
+
+      <p>Los Gates del sistema complementan el middleware a nivel de autorización fina:</p>
+      <pre>Gate::define('pos-operate', fn(User $user, Branch $branch) =>
+    $user->hasRoleInBranch(['cajero', 'supervisor', 'admin-central'], $branch)
+);
+
+Gate::define('void-sale', fn(User $user, Branch $branch) =>
+    $user->hasRoleInBranch(['supervisor', 'admin-central'], $branch)
+);
+
+Gate::define('manage-woo-channels', fn(User $user) =>
+    $user->hasRole('admin-central')
+);</pre>
+
+      <h3>VerifyWebhookSignature</h3>
+      <p><strong>Propósito:</strong> Validar que los <a href="#" data-page="sincronizacion-webhooks" onclick="location.hash='sincronizacion-webhooks';return false;">webhooks</a> entrantes de WooCommerce sean auténticos usando HMAC-SHA256 con un secreto compartido por <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">CanalWoo</a>. Sin esta verificación, cualquier agente externo podría enviar peticiones falsas a los endpoints del sistema.</p>
+      <pre>class VerifyWebhookSignature {
+    public function handle(Request $request, Closure $next): Response {
+        $signature = $request->header('X-WC-Webhook-Signature');
+        $payload = $request->getContent();
+        $canalWooId = $request->route('canal_woo');
+        $canalWoo = CanalWoo::findOrFail($canalWooId);
+
+        $expected = base64_encode(
+            hash_hmac('sha256', $payload, decrypt($canalWoo->webhook_secret), true)
+        );
+
+        if (!hash_equals($expected, $signature)) {
+            Log::warning('Webhook signature inválida', [
+                'canal_woo_id' => $canalWooId,
+                'ip' => $request->ip(),
+            ]);
+            abort(401, 'Invalid webhook signature');
+        }
+
+        return $next($request);
+    }
+}</pre>
+
+      <p><strong>Endpoints protegidos:</strong></p>
+      <table>
+        <tr><th>Endpoint</th><th>Evento WooCommerce</th><th>Acción</th></tr>
+        <tr><td><code>POST /api/webhooks/order-created</code></td><td>order.created</td><td>Importar pedido como venta en estado <code>en_transito</code></td></tr>
+        <tr><td><code>POST /api/webhooks/order-updated</code></td><td>order.updated</td><td>Actualizar estado y notas del pedido</td></tr>
+        <tr><td><code>POST /api/webhooks/product-updated</code></td><td>product.updated</td><td>Re-sincronizar campos propiedad de WooCommerce</td></tr>
+        <tr><td><code>POST /api/webhooks/product-created</code></td><td>product.created</td><td>Importar producto como "no vinculado"</td></tr>
+        <tr><td><code>POST /api/webhooks/stock-updated</code></td><td>stock.updated</td><td>Log de auditoría (no sobreescribe Stock Ledger)</td></tr>
+      </table>
+
+      <div class="info-box">
+        <strong>Procesamiento asíncrono:</strong> Todos los webhooks se procesan dentro de un Job encolado (<code>ProcessInboundWebhook</code>). El middleware solo valida la firma; la lógica de negocio se ejecuta en la cola para no bloquear la respuesta HTTP a WooCommerce.
+      </div>
+    </article>
+
+    <!-- 11.4 Mapa de Rutas del Sistema -->
+    <article class="page" id="backend-guide-rutas">
+      <div class="section-id">11 · Guía de Backend</div>
+      <h2>Mapa de Rutas del Sistema</h2>
+      <p class="lead">Inventario completo de todas las rutas del monolito Laravel. Al usar Inertia.js, el frontend y backend comparten el mismo origen; no existe una API REST interna. La comunicación es vía enrutamiento web clásico con sesiones seguras (Cookies + CSRF).</p>
+
+      <h3>Convenciones generales</h3>
+      <table>
+        <tr><th>Aspecto</th><th>Regla</th></tr>
+        <tr><td>Archivo de rutas web</td><td><code>routes/web.php</code> — 95% del sistema (POS, administración, reportes). Requiere CSRF y autenticación de sesión.</td></tr>
+        <tr><td>Archivo de rutas API</td><td><code>routes/api.php</code> — Exclusivo para webhooks entrantes (máquina-a-máquina). Sin CSRF, payloads JSON directos.</td></tr>
+        <tr><td>Respuesta GET</td><td><code>Inertia::render('ComponenteVue', ['datos' => ...])</code></td></tr>
+        <tr><td>Respuesta POST/PUT/DELETE</td><td><code>back()->with('success', '...')</code> o <code>redirect()->route(...)</code>. Inertia intercepta y actualiza el frontend sin recargar.</td></tr>
+        <tr><td>Autorización</td><td>Por rol (cajero &lt; supervisor &lt; admin_central) vía middleware <code>CheckBranchAccess</code>.</td></tr>
+        <tr><td>Alcance sucursal</td><td>Los controladores filtran datos según sucursales asignadas al usuario (tabla <code>usuario_sucursal</code>).</td></tr>
+      </table>
+
+      <h3>1. Autenticación (Web)</h3>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/login</code></td><td>—</td><td>Pública. Renderiza la vista Vue de Login. Si hay sesión, redirige al dashboard.</td></tr>
+        <tr><td>POST</td><td><code>/login</code></td><td>email, password</td><td>Pública. Valida credenciales, inicializa sesión y redirige al dashboard.</td></tr>
+        <tr><td>POST</td><td><code>/logout</code></td><td>—</td><td>Destruye la sesión, regenera CSRF y redirige a <code>/login</code>.</td></tr>
+      </table>
+
+      <h3>2. Usuarios y Roles (Web)</h3>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/usuarios</code></td><td>busqueda, rol_id (Query)</td><td>Renderiza listado (data table). Roles como props para filtros.</td></tr>
+        <tr><td>GET</td><td><code>/usuarios/crear</code></td><td>—</td><td>Renderiza formulario de creación.</td></tr>
+        <tr><td>POST</td><td><code>/usuarios</code></td><td>nombre, email, password, rol_id, sucursales[]</td><td>Crea usuario. Redirige a <code>usuarios.index</code>.</td></tr>
+        <tr><td>GET</td><td><code>/usuarios/{id}/editar</code></td><td>—</td><td>Renderiza formulario de edición.</td></tr>
+        <tr><td>PUT</td><td><code>/usuarios/{id}</code></td><td>Mismos que POST (password opcional)</td><td>Actualiza usuario. Retorna <code>back()->with('success')</code>.</td></tr>
+        <tr><td>PATCH</td><td><code>/usuarios/{id}/estado</code></td><td>activo (bool)</td><td>Activa/desactiva la cuenta.</td></tr>
+        <tr><td>DELETE</td><td><code>/usuarios/{id}</code></td><td>—</td><td>Soft delete del usuario.</td></tr>
+      </table>
+
+      <h3>3. Sucursales (Web — Resource CRUD)</h3>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/sucursales</code></td><td>—</td><td>Renderiza listado de sucursales.</td></tr>
+        <tr><td>POST</td><td><code>/sucursales</code></td><td>nombre, codigo, direccion, comuna</td><td>Crea la sucursal.</td></tr>
+        <tr><td>PUT</td><td><code>/sucursales/{id}</code></td><td>Mismos campos</td><td>Edita sucursal.</td></tr>
+        <tr><td>DELETE</td><td><code>/sucursales/{id}</code></td><td>—</td><td>Soft delete (bloqueado si hay historial).</td></tr>
+      </table>
+
+      <h3>4. Tiendas WooCommerce y Sincronización (Web)</h3>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/tiendas</code></td><td>—</td><td>Renderiza panel de integraciones WooCommerce.</td></tr>
+        <tr><td>POST</td><td><code>/tiendas</code></td><td>url_base, consumer_key, consumer_secret, webhook_secret</td><td>Guarda tienda con credenciales cifradas.</td></tr>
+        <tr><td>PUT</td><td><code>/tiendas/{id}</code></td><td>Mismos campos</td><td>Actualiza configuración de tienda.</td></tr>
+        <tr><td>POST</td><td><code>/tiendas/{id}/probar-conexion</code></td><td>—</td><td>HTTP request a WooCommerce desde el controlador. Retorna <code>back()->with('status', 'OK')</code>.</td></tr>
+        <tr><td>POST</td><td><code>/tiendas/{id}/sincronizar</code></td><td>entidad</td><td>Dispara Job de sincronización manual (catálogo/stock).</td></tr>
+      </table>
+
+      <h4>4.1 Webhooks Entrantes (API — <code>routes/api.php</code>)</h4>
+      <p>Consumidos por WooCommerce. Sin CSRF. Validados por firma HMAC-SHA256. Responden HTTP 200 inmediato y procesan en Jobs.</p>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body (JSON)</th><th>Descripción</th></tr>
+        <tr><td>POST</td><td><code>/api/webhooks/woo/{tienda_id}/pedido-creado</code></td><td>Payload nativo Woo</td><td>Genera venta en estado <code>en_transito</code>.</td></tr>
+        <tr><td>POST</td><td><code>/api/webhooks/woo/{tienda_id}/pedido-actualizado</code></td><td>Payload nativo Woo</td><td>Actualiza estado del pedido.</td></tr>
+        <tr><td>POST</td><td><code>/api/webhooks/woo/{tienda_id}/producto-actualizado</code></td><td>Payload nativo Woo</td><td>Actualiza/Crea producto local según reglas de conflicto.</td></tr>
+      </table>
+
+      <h3>5. Catálogo y Stock (Web — CRUD)</h3>
+      <p>Patrón idéntico a Usuarios y Sucursales (CRUD web clásico con vistas <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Inertia</a>). Operaciones clave de stock:</p>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/stock</code></td><td>sucursal_id, busqueda (Query)</td><td>Renderiza grilla de stock actual (<code>stock_actual</code>).</td></tr>
+        <tr><td>GET</td><td><code>/stock/movimientos</code></td><td>fecha_desde, producto_id (Query)</td><td>Renderiza vista del Ledger histórico (<code>stock_movimientos</code>).</td></tr>
+        <tr><td>POST</td><td><code>/stock/ajustes</code></td><td>sucursal_id, producto_id, cantidad, comentario</td><td>Crea ajuste manual dentro de una transacción DB.</td></tr>
+        <tr><td>POST</td><td><code>/stock/transferencias</code></td><td>origen_id, destino_id, producto_id, cantidad</td><td>Genera par de movimientos de traslado (origen −, destino +).</td></tr>
+      </table>
+
+      <h3>6. Caja y Ventas (Web — POS)</h3>
+      <p>El carrito vive en memoria (<a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Pinia</a>). Al finalizar la venta se hace una sola llamada al servidor.</p>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/pos</code></td><td>—</td><td>Renderiza interfaz principal del POS. Productos iniciales como props.</td></tr>
+        <tr><td>POST</td><td><code>/caja/abrir</code></td><td>monto_inicial</td><td>Abre sesión de caja del usuario actual.</td></tr>
+        <tr><td>POST</td><td><code>/caja/cerrar</code></td><td>monto_final_declarado</td><td>Cierra sesión y calcula descuadres.</td></tr>
+        <tr><td>POST</td><td><code>/ventas</code></td><td>items[], pagos[]</td><td>Recibe carrito desde Pinia. Descuenta stock, registra pago, encola sync a WooCommerce. Retorna redirect con ID del comprobante.</td></tr>
+        <tr><td>POST</td><td><code>/ventas/{id}/confirmar-despacho</code></td><td>sucursal_id</td><td>Pasa pedido web de <code>en_transito</code> a completada. Actualiza inventario físico.</td></tr>
+      </table>
+
+      <h3>7. Clientes (Web — CRUD + Privacidad)</h3>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/clientes</code></td><td>busqueda (Query)</td><td>Renderiza listado de clientes.</td></tr>
+        <tr><td>POST</td><td><code>/clientes</code></td><td>nombre, email, rut, telefono</td><td>Crea cliente con cifrado de datos sensibles.</td></tr>
+        <tr><td>PUT</td><td><code>/clientes/{id}</code></td><td>Mismos campos</td><td>Actualiza cliente.</td></tr>
+        <tr><td>POST</td><td><code>/clientes/{id}/solicitudes-privacidad</code></td><td>tipo_solicitud</td><td>Registra trámite Ley 21.719 (ARCO+).</td></tr>
+        <tr><td>POST</td><td><code>/clientes/{id}/anonimizar</code></td><td>—</td><td>Ejecuta ofuscación de datos (derecho al olvido).</td></tr>
+      </table>
+
+      <h3>8. Reportes (Web)</h3>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Body / Params</th><th>Descripción</th></tr>
+        <tr><td>GET</td><td><code>/reportes/ventas</code></td><td>fecha_desde, fecha_hasta (Query)</td><td>Renderiza vista con datos desde <code>resumen_ventas_diario</code>.</td></tr>
+        <tr><td>GET</td><td><code>/reportes/exportar</code></td><td>formato (csv | excel)</td><td>Retorna BinaryFileResponse descargable.</td></tr>
+      </table>
+
+      <h3>9. Licenciamiento</h3>
+      <h4>9.1 Rutas de la instalación (Web + API)</h4>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Contexto</th><th>Descripción</th></tr>
+        <tr><td>POST</td><td><code>/licencia/verificar</code></td><td>Web (Admin Vue)</td><td>Forza validación contra stub (MVP) o API central (Fase 2). Retorna redirect con alerta.</td></tr>
+        <tr><td>POST</td><td><code>/api/webhooks/licencia</code></td><td>API (routes/api.php)</td><td>Recibe notificaciones push desde la API Central de Licencias. Sin CSRF, validado por firma criptográfica.</td></tr>
+      </table>
+
+      <h4>9.2 Contrato de la API Central de Licenciamiento (Fase 2 — servicio externo)</h4>
+      <p>Estas rutas no se programan en el MVP. Se documentan para dejar preparado el cliente HTTP de Laravel con esta firma estructural. Base URL: <code>https://licencias.tudominio.cl/api/v1</code></p>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Payload / Query</th><th>Descripción</th></tr>
+        <tr><td>POST</td><td><code>/activaciones</code></td><td>llave_instalacion, dominio</td><td>Una vez al primer arranque. Empareja la instalación.</td></tr>
+        <tr><td>POST</td><td><code>/verificaciones</code></td><td>llave_instalacion</td><td>Chequeo periódico (cron). Retorna <code>{ estado: 'activo'|'suspendido' }</code>.</td></tr>
+        <tr><td>GET</td><td><code>/instalaciones/{llave}</code></td><td>—</td><td>Consulta puntual para el panel de administración central.</td></tr>
+        <tr><td>POST</td><td><code>/instalaciones/{llave}/suspender</code></td><td>motivo</td><td>Ruta administrativa interna del servicio central. Corta el servicio al POS cliente.</td></tr>
+      </table>
+    </article>
+
+    <!-- ================================================================ -->
+    <!--  SECCIÓN 12: HOJA DE RUTA                                        -->
+    <!-- ================================================================ -->
+
+    <!-- 12.1 Secuencia de Construcción -->
+    <article class="page" id="hoja-ruta-pasos">
+      <div class="section-id">12 · Hoja de Ruta</div>
       <h2>Hoja de Ruta (Paso a Paso)</h2>
       <p class="lead">Secuencia lógica de construcción para un desarrollador solitario. Cada paso depende del anterior. No hay fechas ni estimaciones: solo dependencias y criterios de éxito.</p>
 
@@ -2226,12 +2937,12 @@ export function useBarcodeScanner() {
       <h3>Paso 1: Fundaciones y Andamiaje</h3>
       <p><strong>Qué construir:</strong> El esqueleto del sistema. No hay lógica de negocio todavía, solo la infraestructura que la va a sostener.</p>
       <ul>
-        <li>Crear proyecto Laravel 11 + Vue 3 + Inertia.js + Vite. Compilar y verificar que la página de bienvenida carga.</li>
+        <li>Crear proyecto Laravel 11 + <a href="#" data-page="frontend-guide-vue" onclick="location.hash='frontend-guide-vue';return false;">Vue 3</a> + Inertia.js + Vite. Compilar y verificar que la página de bienvenida carga.</li>
         <li>Configurar Tailwind CSS y el layout base (<code>AppLayout.vue</code> con sidebar y topbar).</li>
         <li>Configurar la base de datos MySQL y verificar conexión desde Laravel.</li>
         <li>Diseñar y ejecutar las migraciones iniciales (ver diagrama ERD en sección 4.3): users, roles, sucursales, canal_woos, products, customers, sales, stock_ledger y tablas pivote.</li>
         <li>Implementar autenticación con Laravel Breeze + Inertia (Stack Vue).</li>
-        <li>Implementar la matriz de roles con <code>spatie/laravel-permission</code>: seeders para Cajero, Supervisor y Admin Central.</li>
+        <li>Implementar la matriz de roles con <code><a href="#" data-page="cumplimiento-roles" onclick="location.hash='cumplimiento-roles';return false;">spatie/laravel-permission</a></code>: seeders para Cajero, Supervisor y Admin Central.</li>
         <li>Crear el middleware <code>CheckBranchAccess</code> y el <code>RoleHierarchyService</code>.</li>
       </ul>
       <p><strong>Hito:</strong> Poder loguearse con tres usuarios distintos (uno por rol) y ver el panel correspondiente con distintas opciones en la barra lateral según los permisos. Sin esto, no se puede avanzar.</p>
@@ -2244,9 +2955,9 @@ export function useBarcodeScanner() {
       <p><strong>Qué construir:</strong> Los CRUD que gobiernan la configuración del sistema. No hay transacciones todavía, solo administración de entidades.</p>
       <ul>
         <li>CRUD de Sucursales: crear, editar, listar, eliminar sucursales. Configurar horarios y cobertura de despacho.</li>
-        <li>CRUD de CanalWoo: crear tiendas WooCommerce conectadas con credenciales API cifradas. Asociar cada canal a una sucursal default.</li>
+        <li>CRUD de <a href="#" data-page="inventario-sucursales" onclick="location.hash='inventario-sucursales';return false;">CanalWoo</a>: crear tiendas WooCommerce conectadas con credenciales API cifradas. Asociar cada canal a una sucursal default.</li>
         <li>CRUD de Usuarios: crear usuarios y asignarles roles con ámbito de sucursal (un usuario puede ser Cajero en sucursal A y Supervisor en sucursal B).</li>
-        <li>Implementar el stub de licencia (<code>LocalLicenseStub</code>) como se documenta en la sección 2.4. Verificar que el sistema no bloquee si la licencia "caduca" (siempre responde activo en MVP).</li>
+        <li>Implementar el stub de licencia (<code>LocalLicenseStub</code>) como se documenta en la sección 2.4. Verificar que el sistema no bloquee si la licencia "caduca" (siempre responde activo en <a href="#" data-page="vision-general-alcance-mvp" onclick="location.hash='vision-general-alcance-mvp';return false;">MVP</a>).</li>
       </ul>
       <p><strong>Hito:</strong> Un Admin Central puede crear una sucursal, asociarle un CanalWoo, crear un usuario y asignarle un rol en esa sucursal. Todo persiste y se refleja al recargar.</p>
       <div class="warn-box">
@@ -2259,7 +2970,7 @@ export function useBarcodeScanner() {
       <ul>
         <li>CRUD de Categorías y Productos con variantes (talla/color) y precios multi-sucursal (tabla pivot <code>branch_product</code>).</li>
         <li>Importación/exportación CSV de productos para carga masiva inicial.</li>
-        <li>Construir el <strong>Stock Ledger</strong> (tabla <code>stock_ledger</code>) con los 10 tipos de movimiento documentados en la sección 4.1.</li>
+        <li>Construir el <strong><a href="#" data-page="inventario-stock-ledger" onclick="location.hash='inventario-stock-ledger';return false;">Stock Ledger</a></strong> (tabla <code>stock_ledger</code>) con los 10 tipos de movimiento documentados en la sección 4.1.</li>
         <li>Implementar <code>AdjustStockAction</code> y <code>TransferStockAction</code> como transacciones de base de datos que escriben en el ledger y actualizan el saldo denormalizado (<code>branch_product_stock</code>) si existe.</li>
         <li>Escribir tests unitarios para el ledger: verificar que el saldo calculado (SUM) coincida con el saldo esperado después de secuencias de movimientos (entrada, venta, ajuste, transferencia).</li>
       </ul>
@@ -2290,8 +3001,8 @@ export function useBarcodeScanner() {
         <li>Crear el cliente REST <code>WooCommerceApiClient</code> en <code>Domain/Sync/Clients/</code> usando el HTTP Client de Laravel. Configurar autenticación con Consumer Key + Consumer Secret por CanalWoo.</li>
         <li>Implementar la estrategia de resolución de conflictos elegida (Estrategia A o B de la sección 3.1).</li>
         <li>Jobs de sincronización saliente: <code>SyncProductToWooCommerce</code>, <code>SyncStockToWooCommerce</code>, <code>SyncCustomerToWooCommerce</code>. Todos encolados con prioridad.</li>
-        <li>Endpoint de webhook entrante: crear <code>WebhookController</code> con middleware <code>VerifyWebhookSignature</code>. Implementar handlers para <code>order.created</code>, <code>order.updated</code>, <code>product.updated</code>, <code>product.created</code>.</li>
-        <li>Al recibir un nuevo pedido web (<code>order.created</code>): importar a la tabla <code>sales</code> con estado <code>en_transito</code>, descontar del Stock Ledger (movimiento <code>venta_web</code>), y dejar el pedido en el buzón de asignación de ruta de despacho.</li>
+        <li>Endpoint de <a href="#" data-page="sincronizacion-webhooks" onclick="location.hash='sincronizacion-webhooks';return false;">webhook</a> entrante: crear <code>WebhookController</code> con middleware <code>VerifyWebhookSignature</code>. Implementar handlers para <code>order.created</code>, <code>order.updated</code>, <code>product.updated</code>, <code>product.created</code>.</li>
+        <li>Al recibir un nuevo pedido web (<code>order.created</code>): importar a la tabla <code>sales</code> con estado <code>en_transito</code>, descontar del Stock Ledger (movimiento <code>venta_web</code>), y dejar el pedido en el buzón de asignación de <a href="#" data-page="ventas-rutas-despacho" onclick="location.hash='ventas-rutas-despacho';return false;">ruta de despacho</a>.</li>
         <li>Implementar las Rutas de Despacho (Modo A y B documentados en sección 5.1).</li>
       </ul>
       <p><strong>Hito:</strong> Un producto creado en el POS aparece en WooCommerce. Una venta POS descuenta stock en WooCommerce. Un pedido realizado en la tienda web aparece en el POS como venta <code>en_transito</code> y se puede asignar a una sucursal para despacho.</p>
@@ -2304,11 +3015,11 @@ export function useBarcodeScanner() {
       <p><strong>Qué construir:</strong> Los jobs de fondo que mantienen la salud del sistema y los reportes que el administrador usa para tomar decisiones.</p>
       <ul>
         <li>Crear los Jobs de pre-agregación: <code>AggregateDailySales</code> (cada 30-60 min) y <code>SnapshotStock</code> (cada 15-30 min). Ver sección 8.2 para la implementación.</li>
-        <li>Crear el Job de reconciliación: <code>SyncReconcileStock</code> programado a las 3:00 AM (ver sección 3.3).</li>
+        <li>Crear el Job de <a href="#" data-page="sincronizacion-reconciliacion" onclick="location.hash='sincronizacion-reconciliacion';return false;">reconciliación</a>: <code>SyncReconcileStock</code> programado a las 3:00 AM (ver sección 3.3).</li>
         <li>Configurar las entradas de cron en cPanel para estos jobs.</li>
         <li>Construir las vistas de reportes: resumen de ventas del día, histórico de stock, productos con stock crítico.</li>
         <li>Pruebas de despliegue en entorno cPanel real: verificar que Inertia funciona con HTTPS, que los assets compilados se sirven correctamente, que el cron ejecuta los jobs, que no hay errores de permisos en storage/logs.</li>
-        <li>Simular restricciones de cPanel: probar que la cola <code>database</code> procesa jobs sin Redis, que no hay timeouts de PHP para requests largas, que el .htaccess no bloquea las rutas de Inertia.</li>
+        <li>Simular restricciones de cPanel: probar que la <a href="#" data-page="backend-guide-queues" onclick="location.hash='backend-guide-queues';return false;">cola</a> <code>database</code> procesa jobs sin Redis, que no hay timeouts de PHP para requests largas, que el .htaccess no bloquea las rutas de Inertia.</li>
       </ul>
       <p><strong>Hito:</strong> El administrador puede ver un reporte de ventas del día anterior con latencia de hasta 60 minutos. La reconciliación nocturna no reporta discrepancias falsas. El sistema funciona en un hosting compartido real sin errores.</p>
       <div class="warn-box">
@@ -2332,6 +3043,7 @@ export function useBarcodeScanner() {
 
   </main>
 
+  <script src="js/theme.js"></script>
   <script src="js/navigation.js"></script>
 </body>
 </html>

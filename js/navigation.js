@@ -27,7 +27,8 @@
       subs: [
         { id: 'reglas-verdad', title: 'Reglas de Verdad' },
         { id: 'webhooks', title: 'Webhooks y Sincronización' },
-        { id: 'reconciliacion', title: 'Reconciliación de Stock' }
+        { id: 'reconciliacion', title: 'Reconciliación de Stock' },
+        { id: 'flujo-bpmn', title: 'Flujo BPMN de Sincronización' }
       ]
     },
     {
@@ -72,10 +73,24 @@
       ]
     },
     {
-      id: 'guia', number: '10', title: 'Guía de Desarrollo',
+      id: 'frontend-guide', number: '10', title: 'Guía de Frontend',
       subs: [
-        { id: 'frontend', title: 'Frontend: Vue 3 + Inertia' },
-        { id: 'hoja-ruta', title: 'Hoja de Ruta (Paso a Paso)' }
+        { id: 'vue', title: 'Vue 3 + Inertia' }
+      ]
+    },
+    {
+      id: 'backend-guide', number: '11', title: 'Guía de Backend',
+      subs: [
+        { id: 'queues', title: 'Motor de Colas y Cron' },
+        { id: 'servicios', title: 'Servicios Transversales' },
+        { id: 'middleware', title: 'Middleware y Seguridad en Rutas' },
+        { id: 'rutas', title: 'Mapa de Rutas del Sistema' }
+      ]
+    },
+    {
+      id: 'hoja-ruta', number: '12', title: 'Hoja de Ruta (Paso a Paso)',
+      subs: [
+        { id: 'pasos', title: 'Secuencia de Construcción' }
       ]
     }
   ];

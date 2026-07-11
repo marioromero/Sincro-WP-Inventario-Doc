@@ -411,6 +411,36 @@ El diagrama de topología está embebido en `index.html` (sección 2.3) y muestr
 
 ---
 
+## 11. PATRONES Y SERVICIOS DE BACKEND
+
+Tres páginas nuevas agregadas al portal en sección 11, extraídas de decisiones ya documentadas:
+Posteriormente se agregaron dos páginas más: 3.4 (Flujo BPMN de Sincronización) y 10.2 (Maquetas y Wireframes), junto con buscador, modo oscuro y animaciones CSS en el portal.
+
+### 11.1 Motor de Colas y Cron
+Consolidación de todo lo relativo a la ejecución diferida en cPanel:
+- Pipeline: dispatch → tabla jobs → cron (cada 1 min) → queue:work --stop-when-empty
+- Driver database (no Redis), colas por prioridad high/normal/low
+- Backoff: 5 intentos (30s, 2min, 5min, 15min, 30min)
+- Dead Letter Queue: failed_jobs + sync:retry-all
+- Idempotencia: UUID en X-Idempotency-Key
+- Throttling: 25 req/s por CanalWoo
+- Tabla completa de todos los jobs del sistema con su frecuencia y programación cron
+- Entradas cron reales para copiar/pegar en cPanel
+
+### 11.2 Servicios Transversales
+Componentes de infraestructura definidos por contrato:
+- LicenseValidator (interface) + LocalLicenseStub (implementación MVP)
+- RoleHierarchyService con jerarquía Cajero(1) → Supervisor(2) → AdminCentral(3)
+- WooCommerceApiClient en Domain/Sync/Clients/
+- Conflict Resolvers: TimestampConflictResolver y FieldOwnershipResolver
+
+### 11.3 Middleware y Seguridad en Rutas
+- CheckBranchAccess: verifica rol del usuario en la sucursal activa
+- VerifyWebhookSignature: HMAC-SHA256 con secreto por CanalWoo
+- Gates del sistema (pos-operate, void-sale, manage-woo-channels, view-cross-reports)
+
+---
+
 ## 10. GUÍA DE DESARROLLO
 
 ### 10.1 Frontend: Vue 3 + Inertia
