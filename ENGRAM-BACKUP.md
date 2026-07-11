@@ -18,7 +18,7 @@ Sistema POS + Inventario multi-sucursal para el mercado chileno. Opera como capa
 
 ### 1.3 Diferenciadores
 1. **Local-First:** Opera sin conexión a internet gracias a colas con reintentos
-2. **Multi-sucursal nativo:** Stock, precios y configuración segregados por sucursal
+2. **Multi-sucursal nativo:** Stock y configuración segregados por sucursal; precios globales por variante
 3. **Zero CORS:** Inertia.js elimina problemas de CORS en hosting compartido
 4. **Sin demonios:** Diseñado para cPanel sin procesos persistentes; tareas diferidas via cron
 
@@ -44,16 +44,17 @@ El sistema corre en subdominio propio (ej. sistema.mi-tienda.cl) con su propia B
 
 **Incluido:**
 - POS con venta, descuentos, múltiples medios de pago, impresión ticket
-- Catálogo de Products con variantes y precios multi-sucursal
+- Catálogo de Products con variantes y precios globales (base_price, web_price)
 - Inventario por sucursal con transferencias y ajustes
 - Sincronización WooCommerce bidireccional (stock, products, pedidos)
 - Gestión de pedidos web y POS
-- Roles: Administrador, Supervisor, Vendedor, Bodeguero
+- Roles: Cashier (Cajero), Supervisor, CentralAdmin (Admin Central)
 
 **Excluido (Fase 2):**
 - Facturación DTE
 - Webpay presencial
 - Reportes avanzados
+- Importación/exportación CSV de productos para carga masiva
 
 **Excluido (Fase 3):**
 - App móvil nativa (PWA es paso intermedio)
@@ -150,9 +151,7 @@ $this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
 
 ### 3.1 Reglas de Verdad
 - **Stock:** Bidireccional con jerarquía POS. El POS siempre impone su valor sobre WooCommerce. WooCommerce descuenta para pedidos web, el POS descuenta para ventas presenciales. Ajustes solo desde POS.
-- **Catálogo (Products):** Bidireccional con resolución de conflictos. Dos estrategias documentadas:
-  - *Estrategia A — "Gana el timestamp más reciente":* Simple, compara updated_at. Vulnerable a skew de reloj (>5s).
-  - *Estrategia B — "Bloqueo de campos según origen":* Cada campo tiene dueño definido (sku, price → POS; description, images → WooCommerce). Más robusta pero requiere configuración explícita.
+- **Catálogo (Products):** Bidireccional con resolución de conflictos vía Field Ownership. Cada campo tiene dueño definido (price, stock → POS; description, images → WooCommerce). Nunca se sobreescribe un campo cuyo origen es el otro sistema.
 - **Pedidos web:** WooCommerce → POS (unidireccional). Una vez importados no se modifican retroactivamente.
 - **Customers:** Bidireccional con última escritura gana.
 - **Imágenes:** WooCommerce → POS (referencia por URL).
@@ -162,11 +161,10 @@ $this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
 | Dato | Fuente | Dirección |
 |------|--------|-----------|
 | Stock disponible | POS (Stock Ledger) | POS → WooCommerce (jerarquía POS) |
-| Catálogo — SKU, nombre, precio | POS | POS → WooCommerce (según estrategia) |
-| Catálogo — descripción, imágenes, categorías | WooCommerce | WooCommerce → POS (según estrategia) |
+| Catálogo — SKU, nombre, precio | POS | POS → WooCommerce (Field Ownership) |
+| Catálogo — descripción, imágenes, categorías | WooCommerce | WooCommerce → POS (Field Ownership) |
 | Pedidos web | WooCommerce | WooCommerce → POS (unidireccional) |
 | Customers | POS | Bidireccional |
-| Precios por sucursal | POS | POS → WooCommerce |
 
 ### 3.3 Webhooks Entrantes
 | Evento WC | Endpoint POS | Acción |
@@ -177,7 +175,7 @@ $this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
 | product.created | POST /api/webhooks/product-created | Importar como "no vinculado" |
 | stock.updated | POST /api/webhooks/stock-updated | Log de auditoría (no sobreescribe POS) |
 
-Validación: HMAC-SHA256 con secret compartido. Los webhooks se procesan dentro de un Job para no bloquear la respuesta HTTP.
+Validación: HMAC-SHA256 con webhook_secret obtenido desde la Store correspondiente en base de datos (no usar variable de entorno global). Los webhooks se procesan dentro de un Job para no bloquear la respuesta HTTP.
 
 ### 3.4 Jobs Salientes (REST API asíncrona)
 | Evento POS | Job | Endpoint WC | Prioridad |
@@ -220,16 +218,15 @@ Principios: inmutabilidad, auditabilidad, trazabilidad. Prohibido usar campo de 
 | reversion | ± | Contrapartida de movimiento anterior | Documento original |
 
 **Estructura:**
-- product_id, branch_id, type (string), quantity (int, ±)
-- balance_after (saldo posterior calculado al insertar)
-- user_id, reference (nullableMorphs), reason
-- Index: (product_id, branch_id, created_at)
+- product_variant_id, branch_id, tipo_movimiento (ENUM), quantity (DECIMAL(12,3), ±)
+- user_id, sale_id (FK nullable), reference_type, reference_id (polymorphic), reason
+- Index: (product_variant_id, branch_id, created_at)
 
 **Cálculo:** Stock disponible = SUM(quantity). Stock real = exclude `reserva_en_transito`. Para >100k movimientos: tabla denormalizada `branch_product_stock` actualizada por eventos.
 
 ### 4.2 Sucursales y Canales Web
 
-**Branch (branches):** Entidad con datos de contacto, horario (JSON), config POS, usuarios (N:M con roles por sucursal), precios propios (vía pivot branch_product), stock segregado, cobertura de despacho.
+**Branch (branches):** Entidad con datos de contacto, horario (JSON), config POS, usuarios (N:M con roles por sucursal), stock segregado, cobertura de despacho.
 
 **CanalWoo:** Representa una tienda WooCommerce conectada. Cada canal tiene sus propias credenciales API y webhook secret. Un cliente puede tener múltiples canales (retail, B2B, etc.).
 
@@ -240,12 +237,12 @@ Principios: inmutabilidad, auditabilidad, trazabilidad. Prohibido usar campo de 
 
 **Reglas:**
 - Product sin stock aparece en catálogo como no disponible
-- Precios por sucursal opcionales (fallback a precio base)
+- Precios globales por variante (base_price, web_price)
 - User con roles diferentes por sucursal
 - Stock global solo para reportes
 
 ### 4.3 Diagrama Entidad-Relación
-Diagrama SVG embebido en `index.html` (sección 4.3). Entidades: User, Role, Branch, CanalWoo, Product, Customer, Sale, StockMovement. Pivots: branch_product, product_store_mappings. Relaciones N:M entre User-Role y User-Branch. 1:N: Branch→CanalWoo, Branch→Sale, Product→StockMovement, Customer→Sale.
+Diagrama SVG embebido en `index.html` (sección 4.3). Entidades: User, Role, Branch, Store, Product, Customer, Sale, StockMovement. Pivot: product_store_mappings. Relaciones N:M entre User-Role y User-Branch. 1:N: Branch→Store, Branch→Sale, Product→StockMovement, Customer→Sale.
 
 ---
 
@@ -293,6 +290,15 @@ Roles acumulativos (cada uno hereda del anterior):
 ---
 
 ## 7. DECISIONES PENDIENTES (PREGUNTAS ABIERTAS)
+
+### Resueltas
+
+| Decisión | Resolución |
+|----------|-----------|
+| Precedencia de Promociones (B1) | NO acumulables. El sistema aplica automáticamente la que otorgue el mayor descuento al cliente. |
+| Precios multi-sucursal (B2) | No existe branch_product. Precios globales: base_price y web_price en product_variants. |
+| Resolución conflictos sync (B3) | Field Ownership: POS dueño de price y stock; WooCommerce dueño de description e images. |
+| Webhook secret (A5) | Cada Store tiene su propio webhook_secret cifrado en BD. El middleware busca la Store y desencripta. |
 
 ### 7.1 Webpay Físico
 **Problema:** SDK de Transbank es Java/.NET, requiere bridge con Laravel.

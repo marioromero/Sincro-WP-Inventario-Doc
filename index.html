@@ -98,7 +98,7 @@
       <table>
         <tr><th>Módulo</th><th>Funcionalidades</th></tr>
         <tr><td>POS (Punto de Venta)</td><td>Venta con selección de products, cálculo de total, descuentos línea y global, múltiples medios de pago (efectivo, débito, crédito), impresión de ticket.</td></tr>
-        <tr><td>Catálogo de Products</td><td>CRUD de products, variantes (talla/color), precios multi-sucursal, gestión de SKU, importación/exportación CSV.</td></tr>
+        <tr><td>Catálogo de Products</td><td>CRUD de products, variantes (talla/color), precios globales (base_price y web_price en product_variants), gestión de SKU.</td></tr>
         <tr><td>Inventario por Sucursal</td><td>Stock segregado por sucursal, transferencias entre branches, ajustes de inventario con razón, alerta de stock crítico.</td></tr>
         <tr><td>Sincronización WooCommerce</td><td>Publicación bidireccional de stock, creación/actualización de products desde el POS hacia WooCommerce, recepción de pedidos web.</td></tr>
         <tr><td>Gestión de Pedidos</td><td>Pedidos web importados desde WooCommerce, pedidos POS locales, rutas de despacho simples.</td></tr>
@@ -110,6 +110,7 @@
         <tr><th>Funcionalidad</th><th>Postergado a</th></tr>
         <tr><td>Facturación electrónica (DTE)</td><td>Fase 2 — Se integrará con servicio externo (ej. SII, PayMe).</td></tr>
         <tr><td>Integración Webpay presencial (POS físico)</td><td>Fase 2 — Requiere certificación Transbank.</td></tr>
+        <tr><td>Importación/exportación CSV de productos para carga masiva</td><td>Fase 2 — El MVP se basa en carga manual o importación directa vía API desde WooCommerce.</td></tr>
         <tr><td>Reportes avanzados e inteligencia de negocio</td><td>Fase 2 — Tablero analítico con métricas de sales, rotación de stock, etc.</td></tr>
         <tr><td>App móvil nativa (Android/iOS)</td><td>Fase 3 — PWA como paso intermedio.</td></tr>
         <tr><td>Integración contable (Tally, Siigo, Defontana)</td><td>Fase 3 — Exportación de asientos contables.</td></tr>
@@ -978,7 +979,7 @@ class LocalLicenseStub implements LicenseValidator
       </details>
 
       <div class="warn-box">
-        <strong>IMPORTANTE — Precedencia de promotions:</strong> Antes de programar la lógica de promotions, el equipo debe definir y documentar una regla de precedencia clara (ej. "la promoción de menor descuento gana", "solo una promoción por línea", "NxM se evalúa primero"). Sin esta regla, múltiples promotions aplicables a un mismo producto producirán resultados inconsistentes en <code>POST /sales/preview</code> y en el cierre de venta final.
+        <strong>REGLAS DE NEGOCIO — Precedencia de promotions:</strong> Las promociones NO son acumulables. Si múltiples promociones aplican a la misma línea de venta, el sistema evalúa y aplica automáticamente la que otorgue el mayor descuento al cliente. Esta regla se ejecuta tanto en <code>POST /sales/preview</code> como al confirmar la venta en <code>POST /sales</code>.
       </div>
 
       <h3>12. Resumen de relaciones clave</h3>
@@ -1038,24 +1039,7 @@ class LocalLicenseStub implements LicenseValidator
       </ul>
 
       <h3>Catálogo: bidireccional con resolución de conflictos</h3>
-      <p>El catálogo de products puede modificarse tanto desde el POS como desde WooCommerce. El desarrollador debe elegir una estrategia de resolución de conflictos e implementarla de forma consistente. Se documentan dos estrategias viables:</p>
-
-      <h4>Estrategia A: "Gana el timestamp más reciente"</h4>
-      <p>Cada modificación registra un campo <code>updated_at</code>. Al sincronizar, se compara el timestamp de ambos sistemas y el valor más reciente prevalece. Es la estrategia más simple pero puede perder cambios si hay diferencias de reloj entre servidores (&gt;5s de skew puede causar regresiones).</p>
-      <pre>// Pseudo-código: Estrategia A
-function resolveConflict(Product \$local, array \$wooData): array
-{
-    \$localTime = \$local->updated_at->timestamp;
-    \$wooTime = strtotime(\$wooData['date_modified']);
-
-    if (\$localTime >= \$wooTime) {
-        return \$local->toArray();  // POS gana
-    }
-    return \$wooData;  // WooCommerce gana
-}</pre>
-
-      <h4>Estrategia B: "Bloqueo de campos según origen"</h4>
-      <p>Cada campo del producto tiene un origen propietario definido en una tabla de mapeo. El POS es dueño de <code>sku</code>, <code>stock</code> y <code>price</code>. WooCommerce es dueño de <code>description</code>, <code>images</code> y <code>categories</code>. La sincronización respeta esa propiedad: nunca sobreescribe un campo cuyo origen es el otro sistema.</p>
+      <p>El catálogo de products puede modificarse tanto desde el POS como desde WooCommerce. La estrategia de resolución es <strong>Field Ownership</strong> (Bloqueo de campos según origen): cada campo del producto tiene un origen propietario definido en un archivo de configuración. El POS es dueño de precios y stock. WooCommerce es dueño de descripciones e imágenes. La sincronización respeta esa propiedad: nunca sobreescribe un campo cuyo origen es el otro sistema.</p>
       <pre>// Config: field_ownership.php
 return [
     'sku'         => 'pos',
@@ -1067,9 +1051,8 @@ return [
     'categories'  => 'woocommerce',
     'tags'        => 'woocommerce',
 ];</pre>
-
       <blockquote>
-        <strong>Trade-off:</strong> Estrategia A es más fácil de implementar y entender, pero vulnerable a desincronización de relojes. Estrategia B es más robusta pero requiere configuración explícita por campo y agregar un mecanismo de "reclamo de propiedad" si un operador necesita forzar la sobreescritura.
+        <strong>Nota:</strong> Si un operador necesita forzar la sobreescritura de un campo cuyo origen es el otro sistema, debe existir un mecanismo explícito de "reclamo de propiedad" (ej. un comando Artisan o un botón de Admin) que registre el cambio de ownership en auditoría.
       </blockquote>
 
       <h3>Fuente de verdad por dominio</h3>
@@ -1111,12 +1094,17 @@ return [
       </table>
 
       <h3>Validación de webhooks</h3>
+      <p>El middleware DEBE buscar la Store correspondiente en la tabla <code>stores</code> y desencriptar su <code>webhook_secret</code> desde la base de datos. No debe usar una variable de entorno global (<code>config('services.woocommerce.webhook_secret')</code>) porque cada tienda WooCommerce tiene su propio secreto.</p>
       <pre>// Middleware: VerifyWebhookSignature
 public function handle(Request \$request, Closure \$next)
 {
+    \$storeId = \$request->route('store_id') ?? \$request->input('store_id');
+    \$store = \App\Models\Store::findOrFail(\$storeId);
+    \$secret = decrypt(\$store->webhook_secret);
+
     \$signature = \$request->header('X-WC-Webhook-Signature');
     \$payload = \$request->getContent();
-    \$expected = base64_encode(hash_hmac('sha256', \$payload, config('services.woocommerce.webhook_secret'), true));
+    \$expected = base64_encode(hash_hmac('sha256', \$payload, \$secret, true));
 
     if (!hash_equals(\$expected, \$signature)) {
         abort(401, 'Invalid webhook signature');
@@ -1408,7 +1396,7 @@ public function handle()
         <li>Horario de atención (JSON con rangos semanales y excepciones festivas)</li>
         <li>Configuración POS (impresora por defecto, cajón de dinero, logo personalizado, formato de ticket)</li>
         <li>Usuarios asignados (relación many-to-many con roles específicos por sucursal)</li>
-        <li>Precios propios (sobreescriben el precio base del producto vía tabla pivot <code>branch_product</code>)</li>
+        <li>Precios globales por variante (campos <code>base_price</code> y <code>web_price</code> en <code>product_variants</code>, no existe precio por sucursal)</li>
         <li>Stock segregado (cada movimiento en el ledger pertenece a una sucursal)</li>
         <li>Cobertura de despacho (relación con tabla de comunas para enrutamiento geográfico)</li>
       </ul>
@@ -2328,8 +2316,7 @@ Gate::define('view-cross-reports', fn(User \$user) =&gt;
 │   │   ├── Clients/
 │   │   │   └── WooCommerceApiClient.php
 │   │   └── Rules/
-│   │       ├── FieldOwnershipResolver.php   # Estrategia B: bloqueo de campos
-│   │       └── TimestampConflictResolver.php # Estrategia A: timestamp
+│   │       └── FieldOwnershipResolver.php   # Bloqueo de campos según origen
 │   │
 │   └── Reporting/         # Pre-agregación y reportes
 │       ├── Models/
@@ -2861,11 +2848,10 @@ $this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
       </ul>
 
       <h3>Conflict Resolvers (Sync)</h3>
-      <p>Dos estrategias de resolución de conflictos para el catálogo, definidas en <code>Domain/Sync/Rules/</code>:</p>
+      <p>Una única estrategia de resolución de conflictos para el catálogo, definida en <code>Domain/Sync/Rules/</code>:</p>
       <table>
         <tr><th>Resolvedor</th><th>Estrategia</th><th>Ubicación</th></tr>
-        <tr><td><code>TimestampConflictResolver</code></td><td>Gana el <code>updated_at</code> más reciente. Simple pero vulnerable a skew de reloj (&gt;5s).</td><td><code>Domain/Sync/Rules/</code></td></tr>
-        <tr><td><code>FieldOwnershipResolver</code></td><td>Cada campo tiene dueño (sku, price → POS; description, images → WooCommerce). Nunca se sobreescribe un campo cuyo origen es el otro sistema.</td><td><code>Domain/Sync/Rules/</code></td></tr>
+        <tr><td><code>FieldOwnershipResolver</code></td><td>Cada campo tiene dueño (price, stock → POS; description, images → WooCommerce). Nunca se sobreescribe un campo cuyo origen es el otro sistema.</td><td><code>Domain/Sync/Rules/</code></td></tr>
       </table>
     </article>
 
@@ -3201,8 +3187,8 @@ Gate::define('manage-woo-channels', fn(User $user) =>
       <h3>Paso 3: El Motor de Inventario (Crítico)</h3>
       <p><strong>Qué construir:</strong> El catálogo de products y el Stock Ledger. Este es el módulo más delicado del sistema porque de su correctitud depende la integridad del stock.</p>
       <ul>
-        <li>CRUD de Categorías y Products con variantes (talla/color) y precios multi-sucursal (tabla pivot <code>branch_product</code>).</li>
-        <li>Importación/exportación CSV de products para carga masiva inicial.</li>
+        <li>CRUD de Categorías y Products con variantes (talla/color) y precios globales (<code>base_price</code> y <code>web_price</code> en <code>product_variants</code>).</li>
+        <!-- Importación CSV postergada a Fase 2 (ver sección 1.4) -->
         <li>Construir el <strong><a href="#" data-page="inventario-stock-ledger" onclick="location.hash='inventario-stock-ledger';return false;">Stock Ledger</a></strong> (tabla <code>stock_movements</code>) con los tipos de movimiento documentados en el diccionario (sección 5.1).</li>
         <li>Implementar <code>AdjustStockAction</code> y <code>TransferStockAction</code> como transacciones de base de datos que escriben en el ledger y actualizan el saldo denormalizado (<code>branch_product_stock</code>) si existe.</li>
         <li>Escribir tests unitarios para el ledger: verificar que el saldo calculado (SUM) coincida con el saldo esperado después de secuencias de movimientos (entrada, venta, ajuste, transferencia).</li>
@@ -3223,6 +3209,9 @@ Gate::define('manage-woo-channels', fn(User $user) =>
         <li>Al cerrar la venta: (a) crear registro en <code>sales</code>, (b) descontar del Stock Ledger vía <code>CreateSaleAction</code>, (c) generar comprobante interno (vista HTML imprimible o PDF simple), (d) limpiar el carrito y dejar la caja lista para la siguiente venta.</li>
       </ul>
       <p><strong>Hito:</strong> Un cajero puede abrir la caja, escanear/agregar products, ver el total actualizarse al vuelo, cobrar, y recibir un comprobante. El stock se descuenta correctamente y se refleja en el ledger.</p>
+      <div class="info-box">
+        <strong>Imágenes en el POS:</strong> El POS no guarda imágenes localmente. Consume directamente las URLs de imágenes provenientes de WooCommerce. El listado de productos para la venta muestra las imágenes cargadas desde WooCommerce vía <code>&lt;img src="..."&gt;</code> sin procesamiento ni almacenamiento intermedio.
+      </div>
       <div class="warn-box">
         <strong>Por qué este orden:</strong> El POS es la funcionalidad que el cliente ve y usa todos los días. Tenerlo funcionando rápido (aunque sea sin sincronización externa) permite hacer pruebas de usabilidad con users reales y ajustar la UI antes de agregar la complejidad de la sincronización.
       </div>
@@ -3232,7 +3221,7 @@ Gate::define('manage-woo-channels', fn(User $user) =>
       <p><strong>Qué construir:</strong> Conectar el sistema con WooCommerce para que el catálogo, el stock y los pedidos web fluyan en ambos sentidos.</p>
       <ul>
         <li>Crear el cliente REST <code>WooCommerceApiClient</code> en <code>Domain/Sync/Clients/</code> usando el HTTP Client de Laravel. Configurar autenticación con Consumer Key + Consumer Secret por Store.</li>
-        <li>Implementar la estrategia de resolución de conflictos elegida (Estrategia A o B de la sección 3.1).</li>
+        <li>Implementar la estrategia de resolución de conflictos Field Ownership (sección 3.1).</li>
         <li>Jobs de sincronización saliente: <code>SyncProductToWooCommerce</code>, <code>SyncStockToWooCommerce</code>, <code>SyncCustomerToWooCommerce</code>. Todos encolados con prioridad.</li>
         <li>Endpoint de <a href="#" data-page="sincronizacion-webhooks" onclick="location.hash='sincronizacion-webhooks';return false;">webhook</a> entrante: crear <code>WebhookController</code> con middleware <code>VerifyWebhookSignature</code>. Implementar handlers para <code>order.created</code>, <code>order.updated</code>, <code>product.updated</code>, <code>product.created</code>.</li>
         <li>Al recibir un nuevo pedido web (<code>order.created</code>): importar a la tabla <code>sales</code> con estado <code>en_transito</code>, descontar del Stock Ledger (movimiento <code>venta_web</code>), y dejar el pedido en el buzón de asignación de <a href="#" data-page="sales-rutas-despacho" onclick="location.hash='sales-rutas-despacho';return false;">ruta de despacho</a>.</li>
