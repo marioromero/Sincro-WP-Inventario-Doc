@@ -1,0 +1,3863 @@
+﻿Documentación Técnica — POS + Inventario Multi-Sucursal
+POS + Inventario
+Documentación Técnica · Multi-Sucursal
+01 · Visión General
+Contexto del Producto
+Sistema POS + Inventario multi-sucursal diseñado para el mercado chileno, operando como capa intermedia entre WordPress + WooCommerce y los puntos de venta físicos.
+¿Por qué este producto?
+Los comercios chilenos que operan con WooCommerce enfrentan una desconexión crítica entre su tienda online y sus sucursales físicas: el stock no se sincroniza en tiempo real, las ventas presenciales no se reflejan en el e-commerce, y no existe una fuente de verdad única para el inventario. Este sistema resuelve ese vacío actuando como el sistema de registro central que orquesta tanto los canales digitales como los físicos.
+Mercado objetivo
+Pymes y mid-market chileno con 2 a 20 sucursales físicas.
+Comercios que ya usan WooCommerce y necesitan un POS moderno conectado.
+Dueños de negocio que requieren visibilidad consolidada de inventario y ventas.
+Diferenciadores clave
+Local-First: El sistema funciona incluso si la conexión a internet cae, gracias al motor de colas con reintentos.
+Multi-sucursal nativo: Cada sucursal opera con su propio perfil de stock, precios y configuración.
+Zero CORS: Al usar Inertia.js sobre Laravel, el frontend y backend comparten el mismo origen, eliminando problemas de CORS en hosting compartido.
+Sin demonios: Diseñado para funcionar en cPanel sin procesos persistentes; las tareas diferidas se ejecutan mediante cron.
+Filosofía de diseño: Preferimos un monolito bien modularizado sobre una arquitectura de microservicios. La razón es operativa: el cliente chileno típico contrata hosting compartido donde no puede administrar contenedores ni orquestadores. Un monolito Laravel con boundaries de dominio claros es desplegable, depurable y mantenible por un solo desarrollador.
+01 · Visión General
+Modelo Standalone (Local-First)
+El sistema opera como una aplicación independiente, no como un plugin de WordPress. Esta decisión arquitectónica es fundamental.
+¿Qué significa "Standalone"?
+El sistema corre en su propio subdominio (ej. sistema.mi-tienda.cl) con su propia base de datos Laravel. WordPress y WooCommerce quedan en otro subdominio o ruta (ej. tienda.mi-tienda.cl o /tienda). La comunicación entre ambos sistemas ocurre exclusivamente por API.
+Ventajas del modelo Standalone
+Aislamiento tecnológico: Laravel no comparte el proceso de PHP con WordPress. Una actualización de WooCommerce no rompe el POS.
+Stack moderno: Podemos usar Vue 3, Tailwind y Vite sin depender de la cadena de build de WordPress.
+Escalabilidad independiente: Cada sistema puede escalar sus recursos según su demanda específica.
+Seguridad: El panel administrativo no expone rutas de WordPress. Se reduce la superficie de ataque.
+Arquitectura Local-First
+A diferencia de las SaaS que requieren conexión permanente, este sistema prioriza la operación local:
+Operación local inmediata: Cada transacción POS se registra primero en la base de datos local de Laravel.
+Sincronización asíncrona: Las actualizaciones hacia WooCommerce se encolan y procesan sin bloquear al usuario.
+Reintentos automáticos: Si WooCommerce no responde, la cola reintenta con backoff exponencial.
+Consistencia eventual: El sistema garantiza que el stock de WooCommerce convergerá al valor real, pero acepta desfases temporales controlados.
+Importante: El modelo Local-First implica que WooCommerce no es la fuente de verdad del stock. La fuente de verdad es el Stock Ledger del POS. WooCommerce es un reflejo (copia) cuyo rezago máximo esperado es de 1-2 minutos en condiciones normales.
+01 · Visión General
+Alcance del MVP
+El Producto Mínimo Viable entrega funcionalidad transaccional completa para un operador POS y gestión básica de inventario.
+Incluido en el MVP
+Módulo
+Funcionalidades
+POS (Punto de Venta)
+Venta con selección de productos, cálculo de total, descuentos línea y global, múltiples medios de pago (efectivo, débito, crédito), impresión de ticket.
+Catálogo de Productos
+CRUD de productos, variantes (talla/color), precios multi-sucursal, gestión de SKU, importación/exportación CSV.
+Inventario por Sucursal
+Stock segregado por sucursal, transferencias entre sucursales, ajustes de inventario con razón, alerta de stock crítico.
+Sincronización WooCommerce
+Publicación bidireccional de stock, creación/actualización de productos desde el POS hacia WooCommerce, recepción de pedidos web.
+Gestión de Pedidos
+Pedidos web importados desde WooCommerce, pedidos POS locales, rutas de despacho simples.
+Roles y Usuarios
+Roles: Administrador, Supervisor, Vendedor, Bodeguero. Sesiones por sucursal.
+Fuera del alcance del MVP
+Funcionalidad
+Postergado a
+Facturación electrónica (DTE)
+Fase 2 — Se integrará con servicio externo (ej. SII, PayMe).
+Integración Webpay presencial (POS físico)
+Fase 2 — Requiere certificación Transbank.
+Reportes avanzados e inteligencia de negocio
+Fase 2 — Tablero analítico con métricas de ventas, rotación de stock, etc.
+App móvil nativa (Android/iOS)
+Fase 3 — PWA como paso intermedio.
+Integración contable (Tally, Siigo, Defontana)
+Fase 3 — Exportación de asientos contables.
+CRM y fidelización
+Fase 3 — Programa de puntos, historial de cliente.
+Criterios de éxito del MVP
+Un operador puede completar una venta POS en <15 segundos.
+El stock se sincroniza con WooCommerce en <2 minutos.
+Un administrador puede crear productos y asignarlos a sucursales desde la misma interfaz.
+No se pierde ninguna transacción aunque caiga la conectividad con WooCommerce.
+02 · Arquitectura
+Stack Tecnológico
+Justificación completa de cada decisión tecnológica, con énfasis en las restricciones del entorno cPanel de hosting compartido chileno.
+Backend: Laravel 11
+Laravel es la opción natural para un monolito PHP moderno. Proporciona ORM (Eloquent), sistema de colas con múltiples drivers, autenticación, autorización por políticas, y un ecosistema maduro de paquetes. La versión 11 trae mejoras de rendimiento significativas y una estructura más limpia.
+Frontend: Vue 3 + Inertia.js
+Justificación clave: En un entorno cPanel, donde no podemos configurar un proxy reverso ni manejar CORS fácilmente, Inertia.js elimina la necesidad de una API REST separada. El frontend Vue 3 se renderiza desde las mismas rutas de Laravel, compartiendo sesión, CSRF y autenticación sin configuración adicional.
+Alternativa descartada — API stateless (Breeze/Sanctum): Requeriría manejar tokens JWT, refresh tokens, CORS headers y una doble pipeline de despliegue (frontend separado). En cPanel, cada origen extra es una fuente potencial de bloqueos y bugs difíciles de depurar. Inertia.js reduce la superficie de integración a una sola capa.
+Base de Datos: MySQL 8 / MariaDB 10.6+
+Motor InnoDB con transacciones ACID. El esquema usa migraciones de Laravel. Se prioriza la integridad referencial sobre la flexibilidad documental (no usamos MongoDB ni bases documentales). El driver de colas será database (tabla jobs), no Redis, porque cPanel no ofrece Redis como servicio estándar.
+Build Tooling: Vite + Laravel Vite Plugin
+Vite reemplaza a Laravel Mix (Webpack). Ofrece HMR ultrarrápido en desarrollo y builds optimizadas en producción. Los assets compilados se sirven desde public/build/.
+Cron como Task Scheduler
+En cPanel no podemos mantener un proceso supervisor (como Supervisor en Linux) para gestionar workers de cola. La solución es un cron maestro que ejecuta php artisan queue:work --stop-when-empty cada minuto. Este patrón es estándar en la comunidad Laravel para entornos compartidos.
+Resumen del Stack
+Capa
+Tecnología
+Justificación
+Framework
+Laravel 11
+Ecosistema maduro, colas, ORM, migraciones, testing
+Frontend
+Vue 3 + Inertia.js
+Elimina CORS, sesión compartida, SPA progresivo
+CSS
+Tailwind CSS 3
+Utilidades atómicas, bundles pequeños, diseño responsive
+Base de Datos
+MySQL 8 / MariaDB 10.6
+ACID, disponible en todo hosting compartido
+Colas
+DB driver + Cron
+Sin dependencia de Redis ni demonios externos
+Build
+Vite
+HMR rápido, tree-shaking, code splitting nativo
+E-commerce
+WooCommerce (API REST)
+Estandar de facto en WordPress para Chile
+02 · Arquitectura
+Infraestructura cPanel
+Restricciones operativas del entorno de hosting compartido y cómo la arquitectura se adapta a ellas.
+Restricciones conocidas de cPanel
+Sin demonios persistentes: No podemos ejecutar php artisan queue:work como un servicio supervisor. No hay systemd, supervisord ni screen/tmux disponible.
+Cron con intervalo mínimo de 1 minuto: El scheduler de cPanel permite ejecuciones tan frecuentes como cada minuto. Esto define el límite inferior de latencia de nuestras colas.
+Sin Redis/Memcached garantizado: La mayoría de planes compartidos no incluyen Redis. Algunos ofrecen Memcached pero con recursos limitados. Usamos la base de datos como driver de cola por defecto.
+PHP-FPM con límites de procesos: El número de workers PHP está restringido. Laravel Octane (Roadrunner/Swoole) no es viable. Mantenemos el ciclo de vida request-response tradicional.
+Sin control de servidor web: No podemos configurar Nginx personalizado ni reglas avanzadas de Apache. El archivo .htaccess es nuestra única herramienta de reescritura.
+Almacenamiento compartido: El disco es típicamente NFS o similar. Las operaciones de I/O intensivas deben minimizarse.
+Estrategia de adaptación
+Restricción
+Solución
+Sin demonios
+Cron ejecuta php artisan queue:work --stop-when-empty cada minuto
+Sin Redis
+Driver de cola database con tabla jobs indexada
+PHP-FPM limitado
+Peticiones Inertia ligeras; API calls externalizadas a jobs de cola
+Sin control de servidor
+Toda la lógica de ruteo vive en Laravel, no en el servidor web
+I/O compartida
+Subida de archivos a disco local con sync periódico a cloud storage
+Configuración recomendada de hosting
+PHP 8.2+ con extensiones: BCmath, Ctype, JSON, Mbstring, OpenSSL, PDO, Tokenizer, XML, GD, Zip
+MySQL 8+ con al menos 1 GB de espacio para la base de datos
+Node.js 20+ (para compilación de assets con Vite)
+Composer 2.x para gestión de dependencias PHP
+Subdominio dedicado (ej. sistema.tienda.cl) con SSL
+Atención: No todos los planes de hosting compartido chileno soportan Node.js. Si el plan no lo incluye, los assets deben compilarse en entorno local y subirse ya build (carpeta public/build/). Es una limitación conocida que debe validarse antes de contratar.
+02 · Arquitectura
+Diagrama de Topología
+Visión macro del despliegue: cómo se conectan el navegador del usuario, el monolito Laravel en cPanel y WooCommerce.
+[SVG-DIAGRAMA-1] Cliente Web Navegador / SPA cPanel Hosting (dominio compartido) Laravel Monolith Controladores HTTP Inertia.js · Rutas Web + API propia Base de Datos MySQL 8 · InnoDB · Stock Ledger DB (ORM) --> Eloquent ORM Cola de Trabajos Driver: database · Tabla:...
+Flujo de datos explicado
+Navegación del usuario: El operador POS accede mediante Inertia.js. Las vistas se renderizan desde Laravel (SSR híbrido) sin llamadas API separadas.
+Operación transaccional: Cada venta POS impacta primero la base de datos local (Stock Ledger). No depende de WooCommerce para completarse.
+Encadenamiento asíncrono: Las operaciones que deben reflejarse en WooCommerce se despachan como Jobs a la cola database.
+Procesamiento por Cron: Cada minuto, el cron de cPanel ejecuta php artisan queue:work --stop-when-empty, procesando todos los jobs pendientes.
+Sincronización saliente: Los jobs ejecutan llamadas HTTP a la API REST de WooCommerce para actualizar stock, precios o crear productos.
+Recepción de cambios: WooCommerce notifica eventos (nuevo pedido web, cambio de stock) vía webhook POST hacia el controlador correspondiente.
+Consistencia eventual: El sistema garantiza que el estado de WooCommerce convergerá al estado real, con un rezago máximo esperado de ~1-2 minutos.
+02 · Arquitectura
+Contrato de Licenciamiento
+Mecanismo de licenciamiento diseñado para el MVP: un stub local que siempre responde como activo, con una interfaz preparada para reemplazo futuro por una API real de validación.
+Filosofía: habilitar, no restringir
+En la fase MVP, el objetivo es maximizar la adopción y reducir la fricción de instalación. Implementar un sistema de licenciamiento remoto desde el día cero agregaría complejidad operativa (el sistema no funcionaría sin internet), dependencia de un servicio externo aún no construido, y una experiencia de onboarding negativa.
+Por eso, el MVP incluye un Licensing Stub: un contrato (interface) que el sistema consulta para verificar si la licencia está activa, pero cuya implementación concreta es una clase local que siempre retorna true.
+Diseño del contrato
+// App\Contracts\LicenseValidator.php
+<?php
+namespace App\Contracts;
+interface LicenseValidator
+{
+public function isValid(string $licenseKey): bool;
+public function getLicenseInfo(string $licenseKey): array;
+public function getDaysRemaining(string $licenseKey): ?int;
+}
+Implementación concreta (MVP)
+// App\Services\LocalLicenseStub.php
+<?php
+namespace App\Services;
+use App\Contracts\LicenseValidator;
+class LocalLicenseStub implements LicenseValidator
+{
+public function isValid(string $licenseKey): bool
+{
+return true; // Stub: siempre activo en MVP
+}
+public function getLicenseInfo(string $licenseKey): array
+{
+return [
+'status'    => 'active',
+'plan'      => 'mvp-standalone',
+'source'    => 'stub',
+];
+}
+public function getDaysRemaining(string $licenseKey): ?int
+{
+return 365; // Stub: simula 1 año
+}
+}
+Estrategia de reemplazo futuro
+Cuando el producto escale a un modelo SaaS o se requiera validación centralizada:
+Crear App\Services\CloudLicenseService.php que implemente LicenseValidator, conectándose a una API remota de licencias.
+Cambiar el binding en AppServiceProvider:
+// app/Providers/AppServiceProvider.php
+// MVP:
+\$this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
+// Versión SaaS futura (solo cambiar esta línea):
+// \$this->app->bind(LicenseValidator::class, CloudLicenseService::class);
+El resto del código no requiere modificaciones. Todos los módulos que necesitan verificar licencia dependen de la interfaz LicenseValidator, no de una implementación concreta.
+Principio aplicado: Programación orientada a interfaces (Dependency Inversion). El dominio no debe conocer los detalles de infraestructura. El stub y la API futura son intercambiables sin modificar una sola línea de lógica de negocio.
+02 · Arquitectura
+Diccionario de Datos — Esquema MariaDB
+Especificación completa tabla por tabla: tipo MariaDB, nulabilidad, claves e índices, y explicación funcional. Traducible 1:1 a migraciones de Laravel. Haz clic en cada tabla para expandir sus campos.
+Motor InnoDB estricto. No se permiten tablas MyISAM. Toda FK debe declararse explícitamente. Política RESTRICT priorizada para preservar trazabilidad histórica.
+Prohibición de borrado físico. Toda tabla con datos transaccionales o maestros debe implementar Soft Deletes (deleted_at DATETIME NULL). No se ejecutan DELETE SQL directos nunca.
+Cifrado a nivel de aplicación. Los campos sensibles —rut_cifrado (Ley 21.719), consumer_key, consumer_secret, webhook_secret— se almacenan como VARCHAR(255) cifrados con Laravel Crypt. Nunca se consultan ni filtran en SQL directo.
+Convenciones generales: Charset utf8mb4 / utf8mb4_unicode_ci. Nombres en snake_case plural español. PK siempre id BIGINT UNSIGNED AUTO_INCREMENT salvo pivotes compuestas. Timestamps created_at/updated_at gestionados por Laravel. Booleanos como TINYINT(1) UNSIGNED. Dinero como DECIMAL(12,2). Stock como DECIMAL(12,3).
+1. Configuración e instalación
+1.1 configuracion_sistema — Parámetros clave-valor de la instalación
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+clave
+VARCHAR(100)
+No
+—
+UNIQUE
+Nombre único del parámetro
+valor
+TEXT
+Sí
+NULL
+—
+Valor del parámetro (texto o JSON)
+tipo_dato
+ENUM('string','int','bool','json')
+No
+'string'
+—
+Ayuda a castear el valor
+descripcion
+VARCHAR(255)
+Sí
+NULL
+—
+Explicación legible
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps de Laravel
+1.2 licencia_estado — Cache local del estado de licencia
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+llave_instalacion
+VARCHAR(100)
+No
+—
+UNIQUE
+Token único de instalación
+estado
+ENUM('activo','por_vencer','suspendido')
+No
+'activo'
+INDEX
+Estado de licencia
+fecha_vencimiento
+DATE
+Sí
+NULL
+—
+Vencimiento de licencia
+mensaje
+VARCHAR(255)
+Sí
+NULL
+—
+Mensaje devuelto por API o stub
+es_simulado
+TINYINT(1) UNSIGNED
+No
+1
+—
+1 = stub local, 0 = API real
+ultima_verificacion_at
+DATETIME
+Sí
+NULL
+—
+Última consulta a licencia
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+2. Organización, sucursales y usuarios
+2.1 sucursales — Cada punto de venta físico o virtual de la instalación
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+nombre
+VARCHAR(150)
+No
+—
+—
+Nombre visible
+codigo
+VARCHAR(30)
+No
+—
+UNIQUE
+Código corto interno (ej. SUC-01)
+direccion
+VARCHAR(255)
+Sí
+NULL
+—
+Dirección física
+comuna
+VARCHAR(100)
+Sí
+NULL
+INDEX
+Comuna (para futuro enrutamiento)
+es_virtual
+TINYINT(1) UNSIGNED
+No
+0
+—
+1 = bodega online sin atención presencial
+activa
+TINYINT(1) UNSIGNED
+No
+1
+INDEX
+Si está operativa
+requiere_control_caja
+TINYINT(1) UNSIGNED
+No
+1
+—
+Si 0, la sucursal no exige abrir sesión de caja para vender (venta directa sin arqueo)
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+deleted_at
+DATETIME
+Sí
+NULL
+—
+Soft delete
+2.2 roles — Catálogo de roles con nivel jerárquico para permisos acumulativos
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+nombre
+VARCHAR(50)
+No
+—
+UNIQUE
+cajero, supervisor, admin_central
+nivel_jerarquico
+TINYINT UNSIGNED
+No
+—
+INDEX
+1, 2, 3 para permisos acumulativos
+descripcion
+VARCHAR(255)
+Sí
+NULL
+—
+Descripción del rol
+2.3 usuarios — Empleados que operan el POS o administran el sistema
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+rol_id
+BIGINT UNSIGNED
+No
+—
+FK → roles.id (RESTRICT)
+Rol asignado
+nombre
+VARCHAR(150)
+No
+—
+—
+Nombre completo
+email
+VARCHAR(150)
+No
+—
+UNIQUE
+Correo para login
+password
+VARCHAR(255)
+No
+—
+—
+Hash bcrypt/argon2
+acceso_todas_sucursales
+TINYINT(1) UNSIGNED
+No
+0
+—
+1 para admin central
+activo
+TINYINT(1) UNSIGNED
+No
+1
+INDEX
+Si puede autenticarse
+ultimo_login_at
+DATETIME
+Sí
+NULL
+—
+Último acceso
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+deleted_at
+DATETIME
+Sí
+NULL
+—
+Soft delete
+2.4 usuario_sucursal (pivote) — Relación N:M: a qué sucursales tiene acceso cada usuario
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+usuario_id
+BIGINT UNSIGNED
+No
+—
+PK compuesta, FK → usuarios.id (CASCADE)
+Usuario
+sucursal_id
+BIGINT UNSIGNED
+No
+—
+PK compuesta, FK → sucursales.id (CASCADE)
+Sucursal
+3. Canales de venta (WooCommerce)
+3.1 tiendas — Cada sitio WooCommerce conectado (modelo multi-tienda)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+nombre
+VARCHAR(150)
+No
+—
+—
+Nombre identificador
+url_base
+VARCHAR(255)
+No
+—
+UNIQUE
+URL del WordPress/WooCommerce
+consumer_key
+VARCHAR(255)
+No
+—
+—
+API Key (cifrada app)
+consumer_secret
+VARCHAR(255)
+No
+—
+—
+API Secret (cifrada app)
+webhook_secret
+VARCHAR(255)
+No
+—
+—
+Secreto webhook (cifrada app)
+modo_enrutamiento_despacho
+ENUM('fijo','manual')
+No
+'fijo'
+—
+Modo A (fijo) o B (manual)
+sucursal_despacho_default_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → sucursales.id (SET NULL)
+Sucursal default si modo fijo
+activa
+TINYINT(1) UNSIGNED
+No
+1
+INDEX
+Si la sincronización está habilitada
+ultima_sincronizacion_at
+DATETIME
+Sí
+NULL
+—
+Última sync exitosa
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+4. Catálogo
+4.1 categorias — Categorías de producto, fuente interna mapeadas a WooCommerce
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+categoria_padre_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → categorias.id (RESTRICT)
+Soporta subcategorías
+nombre
+VARCHAR(150)
+No
+—
+—
+Nombre
+slug
+VARCHAR(170)
+No
+—
+UNIQUE
+Identificador amigable
+activa
+TINYINT(1) UNSIGNED
+No
+1
+INDEX
+Si está en uso
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+4.2 categoria_tienda_mapeo — Mapea categorías locales con sus equivalentes en cada tienda Woo
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+categoria_id
+BIGINT UNSIGNED
+No
+—
+FK → categorias.id (CASCADE)
+Categoría local
+tienda_id
+BIGINT UNSIGNED
+No
+—
+FK → tiendas.id (CASCADE)
+Tienda Woo
+woo_category_id
+BIGINT UNSIGNED
+No
+—
+—
+ID en WooCommerce
+ultima_sync_at
+DATETIME
+Sí
+NULL
+—
+Última sync confirmada
+UNIQUE (categoria_id, tienda_id)
+4.3 atributos — Atributos de variación (Color, Talla, etc.)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+nombre
+VARCHAR(100)
+No
+—
+UNIQUE
+Ej. "Color", "Talla"
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+4.4 valores_atributo — Valores posibles de un atributo (Rojo, M, L, etc.)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+atributo_id
+BIGINT UNSIGNED
+No
+—
+FK → atributos.id (CASCADE)
+Atributo padre
+valor
+VARCHAR(100)
+No
+—
+—
+Ej. "Rojo"
+UNIQUE (atributo_id, valor)
+4.5 productos — Producto padre (simple o variable)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+categoria_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → categorias.id (SET NULL)
+Categoría principal
+tipo
+ENUM('simple','variable','combo')
+No
+'simple'
+INDEX
+Tipo de producto. combo indica que se descompone en componentes al venderse
+nombre
+VARCHAR(255)
+No
+—
+INDEX (FULLTEXT recomendado)
+Nombre del producto
+descripcion
+TEXT
+Sí
+NULL
+—
+Descripción larga
+codigo_interno
+VARCHAR(60)
+Sí
+NULL
+UNIQUE
+Código propio del sistema
+activo
+TINYINT(1) UNSIGNED
+No
+1
+INDEX
+Disponible para venta
+origen_creacion
+ENUM('pos','woo')
+No
+'pos'
+—
+Dónde se creó originalmente
+marca_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → marcas.id (SET NULL)
+Marca del producto (opcional)
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+deleted_at
+DATETIME
+Sí
+NULL
+—
+Soft delete
+4.6 producto_variantes — Cada variante vendible (una default para simple, una por combo de atributos para variable)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+producto_id
+BIGINT UNSIGNED
+No
+—
+FK → productos.id (CASCADE)
+Producto padre
+sku
+VARCHAR(100)
+No
+—
+UNIQUE
+Código de la variante
+precio_base
+DECIMAL(12,2) UNSIGNED
+No
+0.00
+—
+Precio de referencia
+precio_web
+DECIMAL(12,2) UNSIGNED
+Sí
+NULL
+—
+Precio específico para web
+unidad_medida
+ENUM('unidad','kg','lt','otro')
+No
+'unidad'
+—
+Si admite fracciones
+activa
+TINYINT(1) UNSIGNED
+No
+1
+INDEX
+Disponible para venta
+descuenta_stock_por_componentes
+TINYINT(1) UNSIGNED
+No
+1
+—
+Solo aplica si productos.tipo = 'combo'. Si 1, vender el combo descuenta stock de cada componente individual
+sincronizable_web
+TINYINT(1) UNSIGNED
+No
+0
+—
+Si 0, esta variante NO se envía a WooCommerce (útil para componentes internos de combos)
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+deleted_at
+DATETIME
+Sí
+NULL
+—
+Soft delete
+4.7 producto_variante_valores (pivote) — Combinación atributo→valor que define cada variante
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+producto_variante_id
+BIGINT UNSIGNED
+No
+—
+PK compuesta, FK → producto_variantes.id (CASCADE)
+Variante
+valor_atributo_id
+BIGINT UNSIGNED
+No
+—
+PK compuesta, FK → valores_atributo.id (CASCADE)
+Valor de atributo
+4.8 producto_tienda_mapeo — Mapea cada variante local con su equivalente en WooCommerce
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+producto_variante_id
+BIGINT UNSIGNED
+No
+—
+FK → producto_variantes.id (CASCADE)
+Variante local
+tienda_id
+BIGINT UNSIGNED
+No
+—
+FK → tiendas.id (CASCADE)
+Tienda Woo
+woo_product_id
+BIGINT UNSIGNED
+No
+—
+—
+ID del producto en Woo
+woo_variation_id
+BIGINT UNSIGNED
+Sí
+NULL
+—
+ID de variación (NULL si simple)
+hash_ultima_sync
+VARCHAR(64)
+Sí
+NULL
+—
+Hash para detectar cambios reales
+ultima_sync_at
+DATETIME
+Sí
+NULL
+—
+Última sync confirmada
+UNIQUE (producto_variante_id, tienda_id)
+5. Stock
+5.1 stock_movimientos — Libro de movimientos (Ledger). Fuente de verdad del stock. Inmutable.
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+sucursal_id
+BIGINT UNSIGNED
+No
+—
+FK → sucursales.id (RESTRICT)
+Sucursal del movimiento
+producto_variante_id
+BIGINT UNSIGNED
+No
+—
+FK → producto_variantes.id (RESTRICT)
+Variante afectada
+tipo_movimiento
+ENUM('entrada','salida','venta_fisica','venta_web','ajuste','reserva','liberacion_reserva','devolucion')
+No
+—
+INDEX
+Tipo de movimiento
+cantidad
+DECIMAL(12,3)
+No
+—
+—
+Cantidad (± según convención)
+tienda_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → tiendas.id (SET NULL)
+Origen si es pedido web
+venta_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → ventas.id (SET NULL)
+Venta asociada
+usuario_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → usuarios.id (SET NULL)
+Usuario que generó el movimiento
+comentario
+VARCHAR(255)
+Sí
+NULL
+—
+Nota libre
+created_at
+DATETIME
+No
+—
+INDEX (sucursal_id, producto_variante_id, created_at)
+Índice compuesto crítico para performance
+5.2 stock_actual (caché) — Snapshot del stock disponible y reservado, recalculado incrementalmente
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+sucursal_id
+BIGINT UNSIGNED
+No
+—
+PK compuesta, FK → sucursales.id (CASCADE)
+Sucursal
+producto_variante_id
+BIGINT UNSIGNED
+No
+—
+PK compuesta, FK → producto_variantes.id (CASCADE)
+Variante
+cantidad_disponible
+DECIMAL(12,3)
+No
+0
+—
+Stock disponible
+cantidad_reservada
+DECIMAL(12,3)
+No
+0
+—
+Stock comprometido en tránsito
+actualizado_at
+TIMESTAMP
+No
+CURRENT_TIMESTAMP ON UPDATE
+—
+Última recalculación
+6. Operación de caja
+6.1 sesiones_caja — Apertura y cierre de caja por sucursal/usuario
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+sucursal_id
+BIGINT UNSIGNED
+No
+—
+FK → sucursales.id (RESTRICT)
+Sucursal
+usuario_id
+BIGINT UNSIGNED
+No
+—
+FK → usuarios.id (RESTRICT)
+Cajero responsable
+estacion_pos_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → estaciones_pos.id (SET NULL)
+Estación POS desde la que se abrió la sesión (opcional). NULL si la sucursal no tiene control de caja
+monto_inicial
+DECIMAL(12,2) UNSIGNED
+No
+0.00
+—
+Monto declarado al abrir
+monto_final_declarado
+DECIMAL(12,2) UNSIGNED
+Sí
+NULL
+—
+Monto contado al cerrar
+monto_final_sistema
+DECIMAL(12,2) UNSIGNED
+Sí
+NULL
+—
+Monto esperado según ventas
+estado
+ENUM('abierta','cerrada')
+No
+'abierta'
+INDEX
+Estado de la sesión
+fecha_apertura
+DATETIME
+No
+—
+—
+Momento de apertura
+fecha_cierre
+DATETIME
+Sí
+NULL
+—
+Momento de cierre
+7. Clientes y privacidad (Ley 21.719)
+7.1 clientes — Minimización de datos; campos sensibles cifrados a nivel de aplicación
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+nombre
+VARCHAR(150)
+No
+—
+—
+Nombre del cliente
+email
+VARCHAR(150)
+Sí
+NULL
+UNIQUE
+Correo (para matching con Woo)
+telefono
+VARCHAR(30)
+Sí
+NULL
+—
+Teléfono de contacto
+rut_cifrado
+VARCHAR(255)
+Sí
+NULL
+—
+RUT cifrado (Laravel Crypt)
+direccion
+VARCHAR(255)
+Sí
+NULL
+—
+Dirección
+consentimiento_datos
+TINYINT(1) UNSIGNED
+No
+0
+—
+Consentimiento explícito otorgado
+finalidad_consentimiento
+VARCHAR(255)
+Sí
+NULL
+—
+Para qué se autorizó usar datos
+fecha_consentimiento
+DATETIME
+Sí
+NULL
+—
+Cuándo se otorgó
+anonimizado
+TINYINT(1) UNSIGNED
+No
+0
+INDEX
+1 si fue anonimizado por solicitud
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+deleted_at
+DATETIME
+Sí
+NULL
+—
+Soft delete
+7.2 cliente_tienda_mapeo — Mapea cliente local con su equivalente en cada tienda Woo
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+cliente_id
+BIGINT UNSIGNED
+No
+—
+FK → clientes.id (CASCADE)
+Cliente local
+tienda_id
+BIGINT UNSIGNED
+No
+—
+FK → tiendas.id (CASCADE)
+Tienda Woo
+woo_customer_id
+BIGINT UNSIGNED
+No
+—
+—
+ID en WooCommerce
+UNIQUE (cliente_id, tienda_id)
+7.3 clientes_solicitudes_privacidad — Registro de solicitudes de derechos ARCO+ (Ley 21.719)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+cliente_id
+BIGINT UNSIGNED
+No
+—
+FK → clientes.id (RESTRICT)
+Cliente solicitante
+tipo_solicitud
+ENUM('acceso','rectificacion','cancelacion','oposicion')
+No
+—
+INDEX
+Derecho ejercido
+estado
+ENUM('recibida','en_proceso','resuelta','rechazada')
+No
+'recibida'
+INDEX
+Estado de gestión
+detalle
+TEXT
+Sí
+NULL
+—
+Detalle o respuesta
+usuario_gestor_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → usuarios.id (SET NULL)
+Admin que gestionó
+created_at
+DATETIME
+No
+—
+—
+Fecha de solicitud
+resuelta_at
+DATETIME
+Sí
+NULL
+—
+Fecha de resolución
+8. Ventas
+8.1 ventas — Cabecera de cada venta (física o web)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+sucursal_id
+BIGINT UNSIGNED
+No
+—
+FK → sucursales.id (RESTRICT)
+Sucursal que despacha
+tienda_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → tiendas.id (SET NULL)
+Origen Woo (NULL = física)
+cliente_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → clientes.id (SET NULL)
+Cliente asociado
+usuario_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → usuarios.id (SET NULL)
+Cajero que registró
+sesion_caja_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → sesiones_caja.id (SET NULL)
+Sesión de caja
+canal_origen
+ENUM('pos','web')
+No
+'pos'
+INDEX
+Origen de la venta
+estado
+ENUM('borrador','pendiente_despacho','en_transito','completada','cancelada','devuelta')
+No
+'completada'
+INDEX
+Estado del ciclo de vida
+referencia_pedido_woo_id
+BIGINT UNSIGNED
+Sí
+NULL
+INDEX
+ID del pedido en WooCommerce
+monto_subtotal
+DECIMAL(12,2) UNSIGNED
+No
+0.00
+—
+Suma líneas antes descuentos
+monto_descuento
+DECIMAL(12,2) UNSIGNED
+No
+0.00
+—
+Descuento total
+monto_total
+DECIMAL(12,2) UNSIGNED
+No
+0.00
+—
+Total final
+moneda
+CHAR(3)
+No
+'CLP'
+—
+Código ISO 4217
+created_at
+DATETIME
+No
+—
+INDEX (sucursal_id, estado, created_at)
+Índice compuesto crítico para reportes
+updated_at
+DATETIME
+No
+—
+—
+Última modificación
+fecha_despacho
+DATETIME
+Sí
+NULL
+—
+Confirmación de despacho
+8.2 venta_detalle — Líneas de producto de cada venta
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+venta_id
+BIGINT UNSIGNED
+No
+—
+FK → ventas.id (CASCADE)
+Venta padre
+producto_variante_id
+BIGINT UNSIGNED
+No
+—
+FK → producto_variantes.id (RESTRICT)
+Variante vendida
+cantidad
+DECIMAL(12,3)
+No
+—
+—
+Cantidad vendida
+precio_unitario
+DECIMAL(12,2) UNSIGNED
+No
+—
+—
+Precio histórico al momento de venta
+descuento_unitario
+DECIMAL(12,2) UNSIGNED
+No
+0.00
+—
+Descuento por unidad
+subtotal
+DECIMAL(12,2) UNSIGNED
+No
+—
+—
+(precio_unitario - descuento) * cantidad
+promocion_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → promociones.id (SET NULL)
+Promoción que se aplicó a esta línea (trazabilidad de descuentos promocionales)
+8.3 venta_pagos — Medios de pago por venta (soporta pagos mixtos)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+venta_id
+BIGINT UNSIGNED
+No
+—
+FK → ventas.id (CASCADE)
+Venta asociada
+medio_pago
+ENUM('efectivo','tarjeta','transferencia','webpay','otro')
+No
+—
+INDEX
+Medio de pago
+monto
+DECIMAL(12,2) UNSIGNED
+No
+—
+—
+Monto pagado
+referencia_transaccion
+VARCHAR(150)
+Sí
+NULL
+—
+ID transacción externa
+estado
+ENUM('registrado','confirmado','anulado')
+No
+'registrado'
+—
+Estado del pago
+created_at
+DATETIME
+No
+—
+—
+Fecha de registro
+9. Sincronización WooCommerce
+9.1 sync_eventos — Registro unificado de cada intento de sincronización (cola + auditoría)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+tienda_id
+BIGINT UNSIGNED
+No
+—
+FK → tiendas.id (CASCADE)
+Tienda involucrada
+entidad_tipo
+ENUM('producto','categoria','stock','pedido','cliente')
+No
+—
+INDEX
+Tipo de entidad
+entidad_id
+BIGINT UNSIGNED
+No
+—
+INDEX
+ID local de la entidad
+direccion
+ENUM('entrante','saliente')
+No
+—
+INDEX
+Dirección del flujo
+estado
+ENUM('pendiente','procesando','exitoso','fallido')
+No
+'pendiente'
+INDEX (estado, entidad_tipo)
+Estado del intento
+intentos
+TINYINT UNSIGNED
+No
+0
+—
+Reintentos realizados
+ultimo_error
+TEXT
+Sí
+NULL
+—
+Detalle del último error
+payload
+JSON
+Sí
+NULL
+—
+Datos enviados/recibidos
+created_at
+DATETIME
+No
+—
+—
+Fecha de creación
+procesado_at
+DATETIME
+Sí
+NULL
+—
+Fecha de resolución
+10. Auditoría
+10.1 auditoria_accesos — Registro de acceso a datos personales (Ley 21.719)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+usuario_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → usuarios.id (SET NULL)
+Usuario (NULL = proceso auto)
+entidad_tipo
+VARCHAR(50)
+No
+—
+INDEX
+Ej. "clientes"
+entidad_id
+BIGINT UNSIGNED
+No
+—
+INDEX
+ID del registro accedido
+accion
+ENUM('ver','crear','editar','eliminar','exportar')
+No
+—
+INDEX
+Tipo de acción
+ip_origen
+VARCHAR(45)
+Sí
+NULL
+—
+IP origen (soporta IPv6)
+created_at
+DATETIME
+No
+—
+INDEX
+Momento del acceso
+11. Reportes pre-agregados
+11.1 resumen_ventas_diario — Recalculado por cron para dashboard de reportes
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+fecha
+DATE
+No
+—
+INDEX
+Día del resumen
+sucursal_id
+BIGINT UNSIGNED
+No
+—
+FK → sucursales.id (CASCADE)
+Sucursal
+canal_origen
+ENUM('pos','web','todos')
+No
+'todos'
+—
+Segmentación por canal
+total_ventas
+DECIMAL(14,2) UNSIGNED
+No
+0.00
+—
+Monto total vendido
+cantidad_transacciones
+INT UNSIGNED
+No
+0
+—
+Número de ventas
+ticket_promedio
+DECIMAL(12,2) UNSIGNED
+No
+0.00
+—
+total_ventas / cantidad
+UNIQUE (fecha, sucursal_id, canal_origen)
+11.2 resumen_stock_diario — Snapshot diario de niveles de stock para análisis de tendencia
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+fecha
+DATE
+No
+—
+INDEX
+Día del snapshot
+sucursal_id
+BIGINT UNSIGNED
+No
+—
+FK → sucursales.id (CASCADE)
+Sucursal
+producto_variante_id
+BIGINT UNSIGNED
+No
+—
+FK → producto_variantes.id (CASCADE)
+Variante
+cantidad_disponible
+DECIMAL(12,3)
+No
+0
+—
+Stock al cierre del día
+cantidad_reservada
+DECIMAL(12,3)
+No
+0
+—
+Stock reservado
+UNIQUE (fecha, sucursal_id, producto_variante_id)
+11.3 combo_componentes — Define los componentes individuales de un producto tipo combo
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+combo_variante_id
+BIGINT UNSIGNED
+No
+—
+FK → producto_variantes.id (CASCADE)
+Variante del combo padre
+componente_variante_id
+BIGINT UNSIGNED
+No
+—
+FK → producto_variantes.id (RESTRICT)
+Variante del producto componente
+cantidad
+DECIMAL(12,3) UNSIGNED
+No
+—
+—
+Cantidad del componente incluida en el combo
+orden
+TINYINT UNSIGNED
+No
+0
+—
+Orden de visualización en el POS
+11.4 promociones — Cabecera de promociones comerciales
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+nombre
+VARCHAR(255)
+No
+—
+—
+Nombre interno de la promoción
+tipo
+ENUM('descuento_porcentaje','descuento_monto_fijo','precio_fijo','nxm')
+No
+—
+INDEX
+Tipo de regla promocional
+valor
+DECIMAL(12,2) UNSIGNED
+No
+—
+—
+Porcentaje o monto según tipo
+n_cantidad
+TINYINT UNSIGNED
+Sí
+NULL
+—
+Para NxM: cantidad N
+m_cantidad
+TINYINT UNSIGNED
+Sí
+NULL
+—
+Para NxM: cantidad M gratis
+canal_aplicable
+ENUM('pos','web','todos')
+No
+'todos'
+—
+Dónde aplica la promoción
+fecha_inicio
+DATETIME
+No
+—
+INDEX
+Inicio de vigencia
+fecha_fin
+DATETIME
+Sí
+NULL
+—
+Fin de vigencia. NULL = sin expiración
+activa
+TINYINT(1) UNSIGNED
+No
+1
+INDEX
+Si 0 se desactiva manualmente
+created_at / updated_at
+DATETIME
+No
+—
+—
+Timestamps
+11.5 promocion_condiciones — Condiciones de aplicabilidad de cada promoción
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+promocion_id
+BIGINT UNSIGNED
+No
+—
+FK → promociones.id (CASCADE)
+Promoción padre
+producto_variante_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → producto_variantes.id (CASCADE)
+Variante específica (NULL = aplica a cualquier producto que cumpla categoría)
+categoria_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → categorias.id (CASCADE)
+Categoría (NULL = no filtrada por categoría)
+sucursal_id
+BIGINT UNSIGNED
+Sí
+NULL
+FK → sucursales.id (CASCADE)
+Sucursal (NULL = todas las sucursales)
+cantidad_minima
+DECIMAL(12,3) UNSIGNED
+No
+1
+—
+Cantidad mínima del producto/categoría para activar la promoción
+NOTA: Si todos los FK son NULL, la promoción aplica a todo el carrito sin restricciones.
+4.9 etiquetas — Etiquetas (tags) para categorización flexible de productos
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+nombre
+VARCHAR(150)
+No
+—
+—
+Nombre visible de la etiqueta
+slug
+VARCHAR(150)
+No
+—
+UNIQUE
+Slug único para sincronización con WooCommerce
+4.10 producto_etiqueta — Pivote N:M entre productos y etiquetas
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+producto_id
+BIGINT UNSIGNED
+No
+—
+FK → productos.id (CASCADE)
+Producto padre
+etiqueta_id
+BIGINT UNSIGNED
+No
+—
+FK → etiquetas.id (CASCADE)
+Etiqueta asignada
+PK COMPUESTA (producto_id, etiqueta_id)
+4.11 etiqueta_tienda_mapeo — Mapeo de etiqueta local a tag de WooCommerce por tienda
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+etiqueta_id
+BIGINT UNSIGNED
+No
+—
+FK → etiquetas.id (CASCADE)
+Etiqueta local
+tienda_id
+BIGINT UNSIGNED
+No
+—
+FK → tiendas.id (CASCADE)
+Tienda WooCommerce
+woo_tag_id
+BIGINT UNSIGNED
+Sí
+NULL
+INDEX
+ID del tag en WooCommerce (NULL si aún no se sincronizó)
+ultima_sync_at
+DATETIME
+Sí
+NULL
+—
+Última sincronización exitosa
+UNIQUE (etiqueta_id, tienda_id)
+4.12 marcas — Marcas de productos
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+nombre
+VARCHAR(255)
+No
+—
+UNIQUE
+Nombre de la marca
+descripcion
+TEXT
+Sí
+NULL
+—
+Descripción breve de la marca
+logo_url
+VARCHAR(500)
+Sí
+NULL
+—
+URL del logo o isotipo
+4.13 marca_tienda_mapeo — Mapeo de marca local a brand de WooCommerce por tienda
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+marca_id
+BIGINT UNSIGNED
+No
+—
+FK → marcas.id (CASCADE)
+Marca local
+tienda_id
+BIGINT UNSIGNED
+No
+—
+FK → tiendas.id (CASCADE)
+Tienda WooCommerce
+woo_brand_id
+BIGINT UNSIGNED
+Sí
+NULL
+INDEX
+ID del brand en WooCommerce (NULL si aún no se sincronizó)
+ultima_sync_at
+DATETIME
+Sí
+NULL
+—
+Última sincronización exitosa
+UNIQUE (marca_id, tienda_id)
+6.2 estaciones_pos — Estaciones físicas o lógicas de POS dentro de una sucursal
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+sucursal_id
+BIGINT UNSIGNED
+No
+—
+FK → sucursales.id (CASCADE)
+Sucursal a la que pertenece
+nombre
+VARCHAR(100)
+No
+—
+—
+Nombre visible (ej. "Caja 1", "Caja 2")
+codigo
+VARCHAR(30)
+No
+—
+UNIQUE
+Código corto único (ej. SUC01-CAJA1)
+activa
+TINYINT(1) UNSIGNED
+No
+1
+INDEX
+Disponible para operar
+6.3 caja_cierre_medios_pago — Desglose por medio de pago declarado al cerrar la sesión de caja (arqueo)
+Campo
+Tipo
+Nulo
+Default
+Clave/Índice
+Descripción
+id
+BIGINT UNSIGNED
+No
+AUTO_INCREMENT
+PK
+Identificador interno
+sesion_caja_id
+BIGINT UNSIGNED
+No
+—
+FK → sesiones_caja.id (CASCADE)
+Sesión de caja padre
+medio_pago
+ENUM('efectivo','tarjeta','transferencia','webpay','otro')
+No
+—
+—
+Medio de pago declarado
+monto_sistema
+DECIMAL(12,2) UNSIGNED
+No
+0.00
+—
+Monto esperado según ventas registradas en el sistema
+monto_declarado
+DECIMAL(12,2) UNSIGNED
+Sí
+NULL
+—
+Monto contado físicamente por el cajero al cerrar
+diferencia
+DECIMAL(12,2)
+No
+0.00
+—
+monto_declarado - monto_sistema (negativo = faltante, positivo = sobrante)
+IMPORTANTE — Precedencia de promociones: Antes de programar la lógica de promociones, el equipo debe definir y documentar una regla de precedencia clara (ej. "la promoción de menor descuento gana", "solo una promoción por línea", "NxM se evalúa primero"). Sin esta regla, múltiples promociones aplicables a un mismo producto producirán resultados inconsistentes en POST /ventas/preview y en el cierre de venta final.
+12. Resumen de relaciones clave
+usuarios.rol_id → roles.id
+usuarios ↔ sucursales vía usuario_sucursal (N:M)
+productos.categoria_id → categorias.id
+producto_variantes.producto_id → productos.id
+producto_variantes ↔ valores_atributo vía producto_variante_valores (N:M)
+productos.marca_id → marcas.id (SET NULL)
+productos ↔ etiquetas vía producto_etiqueta (N:M)
+producto_tienda_mapeo conecta producto_variantes con tiendas (N:M con datos)
+etiqueta_tienda_mapeo conecta etiquetas con tiendas (N:M con datos)
+marca_tienda_mapeo conecta marcas con tiendas (N:M con datos)
+stock_movimientos referencia sucursales, producto_variantes, tiendas, ventas
+ventas.cliente_id → clientes.id, ventas.tienda_id → tiendas.id, ventas.sucursal_id → sucursales.id
+venta_detalle.venta_id → ventas.id, venta_detalle.producto_variante_id → producto_variantes.id
+venta_detalle.promocion_id → promociones.id (SET NULL, trazabilidad de promociones)
+sesiones_caja.estacion_pos_id → estaciones_pos.id (SET NULL)
+caja_cierre_medios_pago.sesion_caja_id → sesiones_caja.id (CASCADE)
+estaciones_pos.sucursal_id → sucursales.id (CASCADE)
+combo_componentes.combo_variante_id → producto_variantes.id (CASCADE)
+combo_componentes.componente_variante_id → producto_variantes.id (RESTRICT)
+promocion_condiciones.promocion_id → promociones.id (CASCADE)
+promocion_condiciones.producto_variante_id → producto_variantes.id (CASCADE, nullable)
+promocion_condiciones.categoria_id → categorias.id (CASCADE, nullable)
+promocion_condiciones.sucursal_id → sucursales.id (CASCADE, nullable)
+sync_eventos.tienda_id → tiendas.id
+13. Notas para el desarrollador
+Los índices compuestos marcados en stock_movimientos y ventas son críticos para rendimiento en hosting compartido (evitan table scans en los cron de reportes y reconciliación).
+stock_actual debe recalcularse de forma incremental (al insertar un movimiento) y no por recomputo total del ledger, salvo en un job de reconciliación periódico que verifique consistencia.
+Todos los campos cifrados (rut_cifrado, consumer_key, consumer_secret, webhook_secret) deben cifrarse/descifrarse exclusivamente a través de un servicio central de la aplicación, nunca en consultas SQL directas.
+Este diccionario cubre el alcance del MVP; los módulos de Fase 2 (facturación electrónica, pagos reales, licenciamiento centralizado) requerirán tablas adicionales que se definirán al abordar cada uno.
+→ Consulta el diagrama ERD en Dominio: Inventario y Catálogo para la representación visual de las relaciones principales de este esquema.
+03 · Sincronización WooCommerce
+Reglas de Verdad
+Definición precisa de qué sistema es la fuente autoritativa para cada fragmento de datos, y cómo se resuelven los conflictos cuando ambos sistemas modifican el mismo recurso.
+Stock: bidireccional con jerarquía POS
+El stock es bidireccional en el sentido de que ambos sistemas pueden modificarlo (WooCommerce descuenta stock cuando llega un pedido web, el POS descuenta cuando hay venta presencial), pero el POS siempre impone su valor sobre WooCommerce cuando hay discrepancia sobre la disponibilidad física local.
+Venta POS: descuenta del Stock Ledger local y encola sync hacia WooCommerce.
+Pedido web: WooCommerce descuenta primero; al importar el pedido, el POS verifica y ajusta si el stock web estaba incorrecto.
+Ajuste de inventario: Siempre se hace en el POS y se propaga a WooCommerce. No se aceptan ajustes desde WooCommerce.
+Catálogo: bidireccional con resolución de conflictos
+El catálogo de productos puede modificarse tanto desde el POS como desde WooCommerce. El desarrollador debe elegir una estrategia de resolución de conflictos e implementarla de forma consistente. Se documentan dos estrategias viables:
+Estrategia A: "Gana el timestamp más reciente"
+Cada modificación registra un campo updated_at. Al sincronizar, se compara el timestamp de ambos sistemas y el valor más reciente prevalece. Es la estrategia más simple pero puede perder cambios si hay diferencias de reloj entre servidores (>5s de skew puede causar regresiones).
+// Pseudo-código: Estrategia A
+function resolveConflict(Product \$local, array \$wooData): array
+{
+\$localTime = \$local->updated_at->timestamp;
+\$wooTime = strtotime(\$wooData['date_modified']);
+if (\$localTime >= \$wooTime) {
+return \$local->toArray();  // POS gana
+}
+return \$wooData;  // WooCommerce gana
+}
+Estrategia B: "Bloqueo de campos según origen"
+Cada campo del producto tiene un origen propietario definido en una tabla de mapeo. El POS es dueño de sku, stock y price. WooCommerce es dueño de description, images y categories. La sincronización respeta esa propiedad: nunca sobreescribe un campo cuyo origen es el otro sistema.
+// Config: field_ownership.php
+return [
+'sku'         => 'pos',
+'name'        => 'pos',
+'price'       => 'pos',
+'stock'       => 'pos',
+'description' => 'woocommerce',
+'images'      => 'woocommerce',
+'categories'  => 'woocommerce',
+'tags'        => 'woocommerce',
+];
+Trade-off: Estrategia A es más fácil de implementar y entender, pero vulnerable a desincronización de relojes. Estrategia B es más robusta pero requiere configuración explícita por campo y agregar un mecanismo de "reclamo de propiedad" si un operador necesita forzar la sobreescritura.
+Fuente de verdad por dominio
+Dato
+Fuente de Verdad
+Dirección Sync
+Stock disponible (cantidad)
+POS (Stock Ledger)
+POS → WooCommerce (jerarquía POS)
+Catálogo — SKU, nombre, precio
+POS
+POS → WooCommerce (según estrategia elegida)
+Catálogo — descripción, imágenes, categorías
+WooCommerce
+WooCommerce → POS (según estrategia elegida)
+Pedidos web (ordenes)
+WooCommerce
+WooCommerce → POS (unidireccional)
+Clientes
+POS (tabla local customers)
+Bidireccional — POS y WC se actualizan mutuamente
+Precios por sucursal
+POS
+POS → WooCommerce (mapeo por regla)
+Imágenes de productos
+WooCommerce (Media Library)
+WC → POS (referencia por URL)
+Gráfica de consistencia
+El sistema opera en el espectro de consistencia eventual. No hay bloqueo distribuido ni transacciones distribuidas. La ventana de inconsistencia máxima esperada es:
+Condiciones normales: < 1 minuto
+Pico de carga (ej. CyberDay): < 5 minutos
+Caída de WooCommerce: indeterminada (backoff exponencial con reintentos cada 5 min × hasta 24 hrs)
+03 · Sincronización WooCommerce
+Webhooks y Sincronización
+Detalle del motor de sincronización: eventos entrantes (webhooks), operaciones salientes (REST API asíncrona), y mecanismos de resiliencia.
+Integración Entrante: Webhooks (WooCommerce → POS)
+WooCommerce dispara webhooks POST hacia rutas dedicadas del POS cuando ocurren eventos. El POS expone endpoints públicos protegidos por un secreto compartido (HMAC-SHA256). Cada webhook se procesa dentro de un Job para no bloquear la respuesta HTTP a WooCommerce.
+Evento WooCommerce
+Endpoint POS
+Acción
+order.created
+POST /api/webhooks/order-created
+Importar pedido como venta en estado en_transito. El pedido queda pendiente de asignación de sucursal (ruta de despacho).
+order.updated
+POST /api/webhooks/order-updated
+Actualizar estado y notas internas del pedido en POS. No modifica líneas de detalle ni cantidades.
+product.updated
+POST /api/webhooks/product-updated
+Re-sincronizar campos cuya propiedad pertenece a WooCommerce según la estrategia de resolución elegida (descripción, imágenes, categorías).
+product.created
+POST /api/webhooks/product-created
+Importar producto como "no vinculado" al POS. Un administrador debe mapearlo manualmente a un producto existente o aprobar su creación.
+stock.updated
+POST /api/webhooks/stock-updated
+Registrar en log de auditoría. No sobreescribe el Stock Ledger del POS. El POS forzará su valor en la siguiente sincronización.
+Validación de webhooks
+// Middleware: VerifyWebhookSignature
+public function handle(Request \$request, Closure \$next)
+{
+\$signature = \$request->header('X-WC-Webhook-Signature');
+\$payload = \$request->getContent();
+\$expected = base64_encode(hash_hmac('sha256', \$payload, config('services.woocommerce.webhook_secret'), true));
+if (!hash_equals(\$expected, \$signature)) {
+abort(401, 'Invalid webhook signature');
+}
+return \$next(\$request);
+}
+Integración Saliente: REST API asíncrona (POS → WooCommerce)
+Los cambios originados en el POS nunca llaman a la API de WooCommerce de forma síncrona durante una request HTTP del usuario. Siempre se despachan Jobs a la cola database, garantizando que la operación POS no depende de la disponibilidad ni latencia de WooCommerce.
+Evento POS
+Job
+Endpoint WooCommerce
+Prioridad
+Crear producto
+SyncProductToWooCommerce
+POST /wp-json/wc/v3/products
+Normal
+Actualizar stock por venta POS
+SyncStockToWooCommerce
+PUT /wp-json/wc/v3/products/{id}
+Alta
+Transferencia entre sucursales
+SyncTransferToWooCommerce
+PUT /wp-json/wc/v3/products/{id}
+Normal
+Crear/actualizar cliente
+SyncCustomerToWooCommerce
+POST /wp-json/wc/v3/customers
+Baja
+Actualizar precio
+SyncPriceToWooCommerce
+PUT /wp-json/wc/v3/products/{id}
+Normal
+Resiliencia del motor de sincronización
+Reintentos con backoff: 5 reintentos con backoff exponencial (30s, 2min, 5min, 15min, 30min).
+Dead Letter Queue: Jobs que fallan después de 5 intentos se mueven a tabla failed_jobs. Un comando artisan (php artisan sync:retry-all) permite re-encolarlos manualmente.
+Idempotencia: Cada job incluye un UUID en el header X-Idempotency-Key. WooCommerce almacena esta clave por 24h para evitar duplicados si el job se ejecuta más de una vez.
+Throttling: Respetamos los límites de rate de la API (usualmente 25 req/s). Se usa el middleware throttle de Laravel HTTP Client con un semáforo por CanalWoo.
+Cola por prioridad: Los jobs de stock usan la cola high; los de clientes, low. El cron procesa primero high antes de tocar low.
+03 · Sincronización WooCommerce
+Reconciliación de Stock
+Job programado que cruza el stock total del POS contra el stock registrado en WooCommerce para detectar discrepancias y forzar la sincronización.
+¿Por qué es necesaria?
+Incluso con un motor de sincronización robusto, pueden ocurrir discrepancias: un webhook no entregado, un job que falló y se perdió en la Dead Letter Queue, una modificación manual directa en WooCommerce, o un error de red transitorio que dejó una operación a medio camino. La reconciliación es la red de seguridad que detecta y corrige estos desajustes.
+Diseño del Job de Reconciliación
+Se implementa como un comando Artisan (php artisan sync:reconcile-stock) que se programa en el cron de cPanel para ejecutarse en ventanas de bajo tráfico (ej. 3:00 AM).
+// app/Console/Commands/ReconcileStock.php
+public function handle()
+{
+// 1. Obtener todos los productos activos con mapeo WooCommerce
+\$products = Product::whereHas('wooMapping')->get();
+foreach (\$products as \$product) {
+// 2. Obtener stock real desde el Ledger del POS
+\$posStock = \$product->getStockTotal();  // suma de ledger (todas las sucursales)
+// 3. Obtener stock desde API de WooCommerce
+\$wooStock = Http::withToken(\$product->canalWoo->api_key)
+->get(\$product->canalWoo->api_url . '/products/' . \$product->wooMapping->woo_id)
+->json('stock_quantity');
+// 4. Si discrepa, encolar job de corrección
+if (\$posStock !== \$wooStock) {
+Log::warning('Stock discrepancy detected', [
+'sku' => \$product->sku,
+'pos' => \$posStock,
+'woo' => \$wooStock,
+]);
+SyncStockToWooCommerce::dispatch(\$product)
+->onQueue('high');
+}
+}
+}
+Configuración del Cron
+En cPanel, se agrega una entrada al cron job que ejecuta el comando una vez al día:
+# Reconciliación diaria de stock — ejecutar a las 3:00 AM
+0 3 * * * /usr/local/bin/php /home/user/public_html/artisan sync:reconcile-stock >> /dev/null 2>&1
+Consideraciones de rendimiento
+Para catálogos grandes (>10,000 productos), la llamada individual a la API de WooCommerce por producto es lenta. Alternativa: usar /wp-json/wc/v3/products?page=1&per_page=100 y construir un mapa en memoria.
+El job respeta el throttle de 25 req/s de WooCommerce. Si hay muchos productos con discrepancias, se encolan gradualmente.
+Se recomienda monitorear el log de discrepancias: un volumen alto sostenido indica un problema sistémico (webhook caído, error de configuración).
+Nota: La reconciliación no reemplaza la sincronización en tiempo real. Es un complemento de verificación periódica. La sincronización vía webhooks + jobs sigue siendo el canal principal.
+03 · Sincronización WooCommerce
+Flujo BPMN de Sincronización
+Diagrama del flujo completo que sigue una venta POS desde que ocurre en la sucursal hasta que se refleja en WooCommerce, incluyendo reintentos, webhooks y reconciliación.
+Diagrama del Flujo
+[SVG-DIAGRAMA-1] Sucursal (POS) Backend Laravel WooCommerce (externo) Cron / Queue (cPanel) ● Inicio Venta POS (store sale) Stock Ledger (movimiento -1) ¿OK? SyncStockToWC (dispatch job) API WooCommerce (REST PUT /stock) HTTP 200? Registro OK (sync_eventos) ◼ Fin No ...
+Figura 3.4 — Flujo BPMN de sincronización POS → WooCommerce con reintentos y cola DB
+Descripción del flujo
+Venta POS: El cajero registra una venta en la sucursal. El sistema registra el movimiento en el Stock Ledger (disminuye stock).
+Dispatch Job: Tras confirmar el movimiento, se despacha SyncStockToWooCommerce a la cola high.
+Cron + DB Queue: Cada minuto cron ejecuta queue:work --stop-when-empty, que toma los jobs pendientes de la tabla jobs.
+API WooCommerce: El job ejecuta un PUT contra /wp-json/wc/v3/products/{id} actualizando el stock.
+Registro OK: Si la respuesta es 200, se registra en sync_eventos con estado completado.
+Reintento: Si falla (timeout, 429, 5xx), se reintenta hasta 5 veces con backoff progresivo (30s, 1min, 3min, 10min, 30min).
+DLQ: Tras 5 fallos, el job pasa a failed_jobs y se notifica al admin.
+Nota importante: La reconciliación (3.3) y el flujo BPMN son complementarios. El flujo BPMN maneja la sincronización en caliente (tiempo real); la reconciliación es la verificación en frío (diaria) que corrige desvíos acumulados.
+04 · Inventario y Catálogo
+Stock Ledger
+El Stock Ledger es el corazón del inventario: un registro inmutable y auditable de cada movimiento que afecta el stock de un producto en una sucursal. Prohibido usar un campo de texto plano para el stock actual.
+Principios del Ledger
+Inmutabilidad: Una vez registrado, un movimiento no se elimina ni modifica. Solo se compensa con un movimiento inverso (ej. una venta anulada genera un movimiento de reversión).
+Auditabilidad: Cada movimiento captura: quién (user_id), qué (product_id, branch_id), cuándo (created_at), por qué (type enum + reason text), cuánto (quantity) y saldo resultante (balance_after).
+Trazabilidad: Cada movimiento referencia el documento origen mediante reference_type y reference_id (polimórfico).
+Tipos de Movimiento
+El enum type clasifica cada operación. Todos los tipos son transaccionales y se registran dentro de una transacción de base de datos junto con el documento que los origina:
+Tipo
+Signo
+Descripción
+Documento origen
+entrada
++
+Ingreso de stock por compra o reposición desde proveedor
+PurchaseOrder / Receipt
+salida
+−
+Egreso de stock por devolución a proveedor o merma autorizada
+Return / WastageNote
+venta_pos
+−
+Descuento por venta presencial en sucursal
+Sale (tipo pos)
+venta_web
+−
+Descuento por pedido web importado desde WooCommerce
+Sale (tipo web)
+ajuste
+±
+Corrección manual de inventario (con razón obligatoria)
+StockAdjustment
+inicial
++
+Saldo inicial al cargar el sistema por primera vez
+InitialStock
+transfer_out
+−
+Salida por transferencia a otra sucursal
+Transfer (origen)
+transfer_in
++
+Entrada por recepción de transferencia
+Transfer (destino)
+reserva_en_transito
+−
+Reserva temporal de stock para un pedido web aún no confirmado
+Sale (estado reservado)
+reversion
+±
+Contrapartida de un movimiento anterior (ej. anulación de venta)
+Original document ID
+Esquema conceptual
+Schema::create('stock_ledger', function (Blueprint \$table) {
+\$table->id();
+\$table->foreignId('product_id')->constrained();
+\$table->foreignId('branch_id')->constrained('sucursales');
+\$table->string('type');  // ver tabla de tipos arriba
+\$table->integer('quantity');  // positivo = entrada, negativo = salida
+\$table->integer('balance_after');  // saldo posterior, calculado al insertar
+\$table->foreignId('user_id')->constrained();
+\$table->nullableMorphs('reference');  // referencia polimórfica al documento origen
+\$table->text('reason')->nullable();
+\$table->timestamps();
+\$table->index(['product_id', 'branch_id', 'created_at']);
+});
+Cálculo del stock disponible
+No se almacena un campo "stock" calculado. El stock se obtiene sumando la tabla ledger:
+public function stockEnSucursal(Branch \$branch): int
+{
+return (int) \$this->stockLedger()
+->where('branch_id', \$branch->id)
+->sum('quantity');
+}
+Para el stock "disponible real" se excluyen las reservas en tránsito:
+public function stockDisponible(Branch \$branch): int
+{
+return \$this->stockEnSucursal(\$branch)
+- (int) \$this->stockLedger()
+->where('branch_id', \$branch->id)
+->where('type', 'reserva_en_transito')
+->sum('quantity');
+}
+Nota de rendimiento: Para inventarios de <100k movimientos por sucursal, la suma directa con índice compuesto es suficientemente rápida (<50ms). Para volúmenes mayores, implementar tabla de resumen (branch_product_stock) actualizada por eventos de dominio.
+04 · Inventario y Catálogo
+Sucursales y Canales Web
+El modelo multi-sucursal se complementa con el concepto de "canal web": cada tienda WooCommerce conectada es un canal independiente con sus propias credenciales y configuración.
+Sucursales (Branches)
+Las sucursales se modelan como una entidad separada (branches), no como un simple campo de texto. Cada venta o movimiento pertenece siempre a una sucursal. La entidad almacena:
+Datos de contacto (dirección, teléfono, email, comuna, región)
+Horario de atención (JSON con rangos semanales y excepciones festivas)
+Configuración POS (impresora por defecto, cajón de dinero, logo personalizado, formato de ticket)
+Usuarios asignados (relación many-to-many con roles específicos por sucursal)
+Precios propios (sobreescriben el precio base del producto vía tabla pivot branch_product)
+Stock segregado (cada movimiento en el ledger pertenece a una sucursal)
+Cobertura de despacho (relación con tabla de comunas para enrutamiento geográfico)
+Canales Web (CanalWoo)
+Un cliente puede tener múltiples tiendas WooCommerce (ej. una tienda retail, una tienda B2B, una tienda para Chile y otra para Perú). Cada una se modela como un CanalWoo independiente:
+Schema::create('canal_woos', function (Blueprint \$table) {
+\$table->id();
+\$table->foreignId('branch_id')->constrained();  // sucursal default para pedidos
+\$table->string('nombre');  // ej. "Tienda Retail", "Tienda B2B"
+\$table->string('url');     // URL base de la tienda WooCommerce
+\$table->string('api_key'); // Consumer Key (cifrado en reposo)
+\$table->string('api_secret'); // Consumer Secret (cifrado en reposo)
+\$table->string('webhook_secret'); // Secreto para validar webhooks entrantes
+\$table->boolean('activo')->default(true);
+\$table->json('config')->nullable();  // mapeo de estados, cola de prioridad, etc.
+\$table->timestamps();
+});
+Cada producto puede tener un mapeo distinto a cada canal WooCommerce, ya que el ID del producto en WooCommerce difiere por tienda. Esto se modela con una tabla pivot:
+Schema::create('product_woo_mappings', function (Blueprint \$table) {
+\$table->id();
+\$table->foreignId('product_id')->constrained();
+\$table->foreignId('canal_woo_id')->constrained();
+\$table->unsignedBigInteger('woo_id');  // ID del producto en WooCommerce
+\$table->string('woo_sku')->nullable(); // SKU en WooCommerce (puede diferir)
+\$table->json('meta_data')->nullable();  // atributos extra de WooCommerce
+\$table->timestamps();
+\$table->unique(['product_id', 'canal_woo_id']);
+\$table->unique(['canal_woo_id', 'woo_id']);
+});
+Multi-sucursal + Multi-canal: reglas de negocio
+Un CanalWoo pertenece a una sucursal por defecto. Los pedidos web de ese canal se asignan inicialmente a esa sucursal (luego puede reasignarse por ruta de despacho).
+Cada CanalWoo tiene sus propias credenciales API y su propio webhook secret. La sincronización itera por canal.
+Un producto puede estar publicado en múltiples canales WooCommerce, cada uno con su propio ID remoto y posiblemente SKU diferente.
+La reconciliación de stock se ejecuta por canal: el stock total del POS se distribuye según la configuración de cada canal (ej. Canal A recibe el 100% del stock de sucursal 1; Canal B recibe la suma de sucursales 1 y 2).
+Transferencias entre sucursales
+El flujo de transferencia sigue un proceso de dos pasos (origen y destino):
+Salida (origen): Se registra transfer_out en la sucursal A. El producto queda "en tránsito".
+Entrada (destino): Cuando la sucursal B confirma recepción, se registra transfer_in. Firma digital del receptor opcional.
+04 · Inventario y Catálogo
+Diagrama Entidad-Relación
+Modelo de datos del núcleo del sistema: entidades principales, sus atributos clave y relaciones.
+[SVG-DIAGRAMA-1] Organización y Canales roles PK id: BIGINT nombre: VARCHAR UNIQUE nivel_jerarquico: TINYINT usuarios PK id: BIGINT FK rol_id → roles (RESTRICT) nombre: VARCHAR(150) email: VARCHAR UNIQUE password: hashed acceso_todas_sucursales: TINYINT + timestamps,...
+Leyenda de relaciones
+Relación
+Cardinalidad
+Descripción
+usuarios → roles
+N:1
+Cada usuario tiene exactamente un rol. FK rol_id con RESTRICT impide borrar roles con usuarios asignados.
+usuarios ↔ sucursales
+N:M
+Un usuario opera en múltiples sucursales vía la pivote usuario_sucursal.
+sucursales → tiendas
+1:N
+Una sucursal puede tener múltiples tiendas WooCommerce como canales de venta.
+sucursales → sesiones_caja
+1:N
+Cada sesión de caja pertenece a una sucursal.
+sucursales → ventas
+1:N
+Cada venta pertenece a la sucursal que la despachó.
+sucursales → stock_movimientos
+1:N
+Todo movimiento de stock está asociado a una sucursal (no hay stock global).
+categorias → productos
+1:N
+Una categoría agrupa muchos productos. Soporta auto-referencia para subcategorías.
+categorias ↔ tiendas
+N:M
+Una categoría se mapea a categorías remotas en cada tienda Woo (pivote categoria_tienda_mapeo).
+productos → producto_variantes
+1:N
+Un producto tiene una o más variantes vendibles. El SKU vive en la variante, no en el producto.
+producto_variantes ↔ tiendas
+N:M
+Una variante se publica en múltiples tiendas WooCommerce vía producto_tienda_mapeo.
+atributos → valores_atributo
+1:N
+Un atributo (Color, Talla) tiene múltiples valores (Rojo, M, etc.).
+producto_variantes ↔ valores_atributo
+N:M
+Una variante se define por una combinación de valores de atributo vía producto_variante_valores.
+producto_variantes → venta_detalle
+1:N
+Las líneas de venta referencian variantes específicas con precios históricos.
+producto_variantes → stock_movimientos
+1:N
+Cada movimiento del ledger afecta a una variante. Fuente de verdad del stock.
+clientes → cliente_tienda_mapeo
+1:N
+Un cliente se mapea a su equivalente en cada tienda Woo via pivote.
+clientes → clientes_solicitudes_privacidad
+1:N
+Un cliente puede ejercer múltiples derechos ARCO+ (Ley 21.719).
+clientes → ventas
+1:N
+Un cliente puede tener múltiples ventas en su historial.
+sesiones_caja → ventas
+1:N
+Cada venta ocurre dentro de una sesión de caja abierta.
+ventas → venta_detalle
+1:N
+Cada venta tiene una o más líneas de detalle con precios históricos inmutables.
+ventas → venta_pagos
+1:N
+Una venta puede tener múltiples medios de pago (soporta pagos mixtos).
+ventas → stock_movimientos
+1:N
+Una venta genera movimientos de salida en el ledger (descuento de stock).
+ventas → resumen_ventas_diario
+alimenta
+El cron de reportes agrega ventas diarias a esta tabla pre-agregada.
+stock_movimientos → stock_actual
+alimenta
+Al insertar un movimiento, se recalcula incrementalmente el caché de stock actual.
+stock_actual → resumen_stock_diario
+alimenta
+Snapshot diario del stock para análisis de tendencia.
+tiendas → sync_eventos
+1:N
+Todo evento de sincronización (entrante/saliente) se registra contra una tienda.
+tiendas → ventas
+1:N
+Una venta web se asocia a la tienda WooCommerce de origen.
+Las 28 tablas del sistema están representadas. Las tablas pivote (N:M) se muestran con bordes discontinuos. Los fondos de color agrupan tablas por módulo funcional. Consulta el Diccionario de Datos para la especificación completa de campos, tipos e índices.
+05 · Ventas y Pedidos Web
+Rutas de Despacho
+Los pedidos web importados desde WooCommerce requieren asignación a una sucursal para su preparación y despacho. El MVP soporta dos modos de asignación, y un tercero queda en backlog.
+Modo A: Sucursal fija / Bodega central
+Configuración: Todo pedido web se asigna automáticamente a una sucursal específica (la "bodega central" o "sucursal de despacho") configurada en el CanalWoo.
+Cuándo usarlo: Clientes con una sola sucursal operativa que centraliza todos los despachos, o clientes que tercerizan la logística y solo necesitan consolidar pedidos en un punto.
+Implementación: El campo canal_woos.branch_id se usa como sucursal de despacho default. No hay intervención manual.
+Modo B: Selección manual por supervisor
+Configuración: Los pedidos web llegan en estado pending_assignment y aparecen en un "buzón de asignación" del panel POS. Un supervisor selecciona manualmente la sucursal de preparación y despacho.
+Cuándo usarlo: Clientes con múltiples sucursales donde la decisión de despacho depende de factores no modelados (disponibilidad de personal, horarios, tipo de producto).
+Implementación: El supervisor ve una lista de pedidos no asignados con datos del cliente y productos. Selecciona una sucursal y el pedido pasa a estado assigned.
+Modo C: Enrutamiento geográfico (backlog Fase 2)
+Concepto: El sistema asigna automáticamente el pedido a la sucursal más cercana al domicilio del cliente según la comuna de envío, usando una tabla de cobertura por sucursal.
+Por qué no está en el MVP: Requiere mantener una base de datos de comunas y cobertura por sucursal, manejar excepciones (sucursal sin stock del producto), y validar direcciones. Es una funcionalidad deseable pero no crítica para la operación inicial.
+Implementación futura: Cuando se active el Modo C, la asignación automática evaluará primero cobertura geográfica, luego disponibilidad de stock, y finalmente reglas de negocio (costo de despacho, tiempo estimado). El Modo B se usará como fallback si la asignación automática no encuentra candidata.
+Estados de una ruta de despacho
+Estado
+Descripción
+Visible al cliente en WC
+pending_assignment
+Pedido web importado, esperando asignación a sucursal
+Procesando
+assigned
+Asignado a sucursal, pendiente de preparación
+Procesando
+preparing
+Bodeguero está armando el pedido
+Procesando
+ready_for_pickup
+Listo para retiro en sucursal
+Listo para retiro
+in_delivery
+En ruta de despacho a domicilio
+En camino
+delivered
+Entregado al cliente
+Completado
+cancelled
+Cancelado (con nota de razón)
+Cancelado
+Integración con WooCommerce
+Cada cambio de estado en el POS actualiza el estado del pedido en WooCommerce mediante la API REST y, opcionalmente, agrega una nota privada visible para el administrador de la tienda.
+MVP vs futuro: En el MVP, las rutas de despacho se gestionan manualmente (Modo A o B). La integración con servicios externos de tracking (Chilexpress, Starken, Bluexpress) queda para fases posteriores.
+06 · Cumplimiento y Seguridad
+Privacidad por Diseño (Ley 21.719)
+La Ley 21.719 (modificación a la Ley 19.628 de protección de datos personales en Chile) exige que cualquier sistema que procese datos de ciudadanos chilenos implemente privacidad desde el diseño y por defecto. A continuación, las directrices concretas para el módulo de clientes.
+Minimización de datos
+El sistema solo debe recolectar los datos estrictamente necesarios para la operación comercial. Los campos obligatorios del formulario de registro son: RUT (para facturación), nombre, email (para comunicación) y teléfono (para despacho). Dirección, fecha de nacimiento, género y otros datos demográficos son opcionales y deben recolectarse con consentimiento explícito adicional.
+Cifrado en reposo de campos sensibles
+Tres campos se consideran datos sensibles y deben almacenarse cifrados con AES-256 usando una clave por instalación almacenada fuera de la base de datos (variable de entorno APP_DATA_KEY):
+RUT/DNI: Cifrado con lakm/laravel-encrypted-trait. Se indexa el hash del RUT para búsquedas únicas.
+Email: Cifrado en reposo. Se almacena un hash SHA-256 en una columna auxiliar para búsquedas por login.
+Teléfono: Cifrado en reposo. No se indexa para búsqueda.
+// Ejemplo: Customer model con cifrado
+use LakM\LaravelEncrypted\Traits\HasEncryptedAttributes;
+class Customer extends Model
+{
+use HasEncryptedAttributes;
+protected \$encrypted = ['rut', 'email', 'phone'];
+// Hash para búsquedas únicas por RUT
+public function setRutAttribute(\$value)
+{
+\$this->attributes['rut'] = encrypt(\$value);
+\$this->attributes['rut_hash'] = hash('sha256', \$value);
+}
+public function scopeFindByRut(\$query, \$rut)
+{
+return \$query->where('rut_hash', hash('sha256', \$rut));
+}
+}
+Consentimiento explícito
+El sistema debe registrar en la base de datos el consentimiento del cliente para cada finalidad de uso de sus datos:
+Schema::create('customer_consents', function (Blueprint \$table) {
+\$table->id();
+\$table->foreignId('customer_id')->constrained()->cascadeOnDelete();
+\$table->string('purpose');  // 'marketing', 'data_processing', 'sharing_third_party'
+\$table->boolean('granted');
+\$table->string('ip_address')->nullable();
+\$table->string('policy_version');  // versión de la política de privacidad al momento del consentimiento
+\$table->timestamps();
+});
+El check de consentimiento no puede venir pre-seleccionado.
+El cliente puede revocar su consentimiento en cualquier momento desde su perfil.
+La revocación no invalida el procesamiento previo, pero detiene el uso futuro.
+Derecho al Olvido (eliminación / anonimización)
+El sistema debe exponer un endpoint (API y UI) para que el cliente solicite la eliminación de sus datos. El proceso sigue estos pasos:
+El cliente (o un administrador en su nombre) inicia la solicitud.
+El sistema verifica que no existan obligaciones legales que impidan la eliminación (ej. facturas emitidas que requieren retención de datos por 5 años).
+Si hay obligaciones, los datos del cliente se anonimizan: se reemplazan nombre, email, teléfono y RUT por valores irreversibles (ej. "Cliente Anonimizado #123", "anon-xxxxx@anonymous.com").
+Si no hay obligaciones, se eliminan los registros del cliente y se anonimizan las referencias en ventas históricas.
+Se registra en un log de auditoría la acción con fecha, operador y alcance.
+// CustomerController
+public function requestForget(Customer \$customer)
+{
+\$hasInvoices = \$customer->sales()
+->whereNotNull('dte_uuid')
+->exists();
+if (\$hasInvoices) {
+// Anonimizar en lugar de eliminar
+\$customer->anonymize();
+return response()->json(['message' => 'Datos anonimizados. Facturas retenidas por obligación legal.']);
+}
+// Eliminación completa
+\$customer->delete();
+return response()->json(['message' => 'Solicitud completada. Datos eliminados.']);
+}
+Derecho de rectificación
+El cliente puede actualizar sus datos personales directamente desde su perfil. Cada cambio queda registrado en una tabla customer_data_changes con el valor anterior, el nuevo valor, la fecha y el IP desde donde se realizó el cambio. Esto permite reconstruir el historial de modificaciones en caso de disputa.
+Obligaciones aplicables (resumen)
+Requisito
+Implementación
+Consentimiento explícito
+Checkbox separado, no pre-seleccionado. Registro con finalidad, IP y versión de política.
+Derecho ARCO (acceso, rectificación, cancelación, oposición)
+API de exportación JSON. Endpoint de rectificación. Endpoint de olvido con anonimización.
+Portabilidad
+Exportación JSON completa de datos del cliente descargable desde el perfil.
+Seguridad de datos
+AES-256 en reposo para RUT, email, teléfono. TLS 1.3 en tránsito. bcrypt para passwords.
+Notificación de brechas
+Log de accesos a datos personales. Alerta al administrador ante patrones anómalos.
+Periodo de retención
+Configurable por tipo de dato. Purga automática tras 5 años sin actividad.
+Nota: Esta documentación constituye una guía técnica de implementación, no asesoría legal. Se recomienda que un abogado especialista en protección de datos revise el cumplimiento específico para cada instalación.
+06 · Cumplimiento y Seguridad
+Matriz de Roles MVP
+Tres roles acumulativos en el MVP — cada rol hereda los permisos del nivel anterior. El alcance siempre está acotado por sucursal, excepto donde se indique lo contrario.
+Principio de alcance acumulativo
+Los roles siguen una jerarquía lineal: Cajero → Supervisor → Admin Central. Cada rol incluye todos los permisos del rol anterior más los suyos propios. Esto simplifica la administración: no es necesario gestionar roles compuestos ni permisos individuales.
+Roles del MVP
+Rol
+Ámbito
+Permisos incluidos (acumulativos)
+Cajero
+Su sucursal asignada
+• Realizar ventas POS (abrir/cerrar caja, cobrar, emitir ticket)
+• Ver stock de su sucursal (solo lectura)
+• Registrar clientes nuevos (datos básicos)
+• Consultar historial de ventas propias
+Supervisor
+Su sucursal asignada
+• Todo lo de Cajero
+• Anular ventas (con razón obligatoria)
+• Gestionar transferencias de stock entre sucursales
+• Asignar pedidos web a ruta de despacho (Modo B)
+• Realizar ajustes de inventario
+• Ver reportes de ventas y stock de su sucursal
+Admin Central
+Global (todas las sucursales)
+• Todo lo de Supervisor (en cualquier sucursal)
+• CRUD de productos, sucursales, usuarios y canales Woo
+• Configurar canales WooCommerce (credenciales API, webhooks)
+• Ver reportes consolidados (cruzados por sucursal)
+• Gestionar licencias y configuración del sistema
+• Acceso al log de auditoría y reconciliación
+Implementación técnica
+Usamos spatie/laravel-permission con una adaptación multi-sucursal:
+Los roles se asignan a un usuario en relación con una sucursal mediante la tabla pivot model_branch_roles (user_id, role_id, branch_id).
+El middleware CheckBranchAccess verifica que el usuario tenga el rol requerido en la sucursal activa de la sesión.
+Los permisos globales (Admin Central) se asignan sin sucursal (branch_id = null).
+Para la jerarquía acumulativa, se usa un RoleHierarchyService que permite a un rol ejecutar Gates definidos para roles inferiores.
+// Gates del sistema
+Gate::define('pos-operate', fn(User \$user, Branch \$branch) =>
+\$user->hasRoleInBranch(['cajero', 'supervisor', 'admin-central'], \$branch)
+);
+Gate::define('void-sale', fn(User \$user, Branch \$branch) =>
+\$user->hasRoleInBranch(['supervisor', 'admin-central'], \$branch)
+);
+Gate::define('manage-woo-channels', fn(User \$user) =>
+\$user->hasRole('admin-central') // Global
+);
+Gate::define('view-cross-reports', fn(User \$user) =>
+\$user->hasRole('admin-central')
+);
+Matrix visual de acceso por módulo
+Módulo / Acción
+Cajero
+Supervisor
+Admin Central
+POS — Vender
+Sí
+Sí
+Sí
+POS — Anular venta
+No
+Sí
+Sí
+Stock — Ver stock sucursal
+Sí
+Sí
+Sí
+Stock — Ajustar inventario
+No
+Sí
+Sí
+Stock — Transferencias
+No
+Sí
+Sí
+Pedidos — Asignar ruta despacho
+No
+Sí
+Sí
+Productos — CRUD
+No
+No
+Sí
+Sucursales — CRUD
+No
+No
+Sí
+Canales Woo — Configurar
+No
+No
+Sí
+Usuarios — Gestionar
+No
+No
+Sí
+Reportes — Por sucursal
+No
+Sí
+Sí
+Reportes — Consolidado global
+No
+No
+Sí
+Auditoría — Log del sistema
+No
+No
+Sí
+07 · Preguntas Abiertas
+Webpay Físico
+La integración con Webpay Plus Presencial (terminal POS físico de Transbank) queda fuera del MVP pero es la funcionalidad más solicitada por los clientes.
+¿Qué implica?
+Webpay Plus Presencial requiere un terminal POS físico conectado por puerto serie o Bluetooth a un computador con el sistema POS. Transbank provee un SDK (generalmente DLL en Windows o JAR en Java) que debe ser llamado desde el sistema para iniciar la transacción.
+Desafíos técnicos
+Compatibilidad con Laravel (PHP): El SDK de Transbank es para Java/.NET. Habría que crear un bridge (ej. microservicio en Node.js o contenedor Java) que se comunique con Laravel vía socket local o API HTTP.
+Certificación: Transbank exige certificación para cada integración. El proceso puede tomar 2-4 semanas.
+Multi-plataforma: El POS corre en navegador (cualquier SO), pero el bridge con el terminal POS es dependiente del SO del operador.
+Sin demonios en cPanel: El bridge sería un proceso externo que debe ejecutarse en la máquina del operador, no en el servidor.
+Arquitectura propuesta (futura)
+┌─────────────┐    WebSocket     ┌──────────────┐    Puerto Serie    ┌──────────┐
+│  Laravel POS │◄──────────────►│  Bridge POS   │◄────────────────►│ Terminal  │
+│  (Navegador) │    localhost    │  (Node.js)    │    / Bluetooth    │ Transbank │
+└─────────────┘    :6001        └──────────────┘                   └──────────┘
+Decisión pendiente: Evaluar si se usa la nueva API REST de Transbank (Webpay API 2.0) que permite integración sin SDK propietario, mediante QR dinámico y pago desde el teléfono del cliente, eliminando la necesidad del bridge local.
+07 · Preguntas Abiertas
+Facturación DTE
+La facturación electrónica chilena (DTE) es obligatoria para la mayoría de los comercios. Su implementación requiere integración con el SII o un proveedor autorizado.
+Contexto legal
+Chile exige emisión de Documentos Tributarios Electrónicos (DTE) desde 2018 para la mayoría de los contribuyentes. Los tipos de documento relevantes son:
+Boleta Electrónica: Para consumidores finales (sin RUT).
+Factura Electrónica: Para empresas (con RUT).
+Nota de Crédito/Débito: Para correcciones.
+Opciones de integración
+Proveedor
+Tipo
+Ventajas
+Desventajas
+SII Directo (libre)
+API SOAP
+Sin costo por transacción
+Integración compleja, requiere firma electrónica, certificación SII
+PayMe
+API REST
+SDK moderno, soporte local, precios competitivos
+Costo mensual + por documento
+Efact
+API REST
+Amplia adopción en Chile, buen soporte
+Costo más alto
+SimpleFact
+API REST
+Económico, API moderna
+Menos trayectoria
+Preguntas abiertas para decisión
+¿Se factura desde el POS o desde WooCommerce? Opción A: El POS emite la boleta/factura al momento de la venta presencial. Opción B: WooCommerce emite los DTE de pedidos web. Lo ideal sería ambos, pero duplica la integración.
+¿Timing de emisión? Inmediata (al pagar) vs. diferida (al despachar). La ley permite ambas, pero la inmediata es mejor para el cliente.
+¿Múltiples sucursales con un solo RUT? Si el cliente tiene un RUT para todas las sucursales, los DTE se emiten con ese RUT pero deben identificar la sucursal emisora en el detalle.
+¿RUT de cliente obligatorio? Para boletas no es obligatorio; para facturas sí. El POS debe manejar ambos flujos.
+Decisión pendiente: Se recomienda integrar con un proveedor tipo PayMe para la Fase 2, ya que reduce drásticamente el tiempo de implementación comparado con la integración directa al SII. El costo por transacción se traslada al cliente como costo operacional.
+08 · Estructura y Operación Interna
+Core Backend: Estructura de Directorios
+El proyecto rechaza la estructura MVC plana de Laravel (app/Models, app/Http/Controllers) en favor de una organización por dominios (DDD ligero). Esto aísla la lógica de negocio para un desarrollador que trabaja solo y facilita migraciones futuras.
+Decisión arquitectónica: No usar app/Models/ como cajón de sastre. Cada módulo vive en app/Domain/<Nombre>/ con sus propios modelos, acciones, jobs y reglas de negocio. Esto permite que, en un escenario de crecimiento, un dominio como Sync pueda extraerse a un microservicio independiente con mínimo esfuerzo.
+Árbol de directorios propuesto
+app/
+├── Domain/
+│   ├── Identity/          # Roles, usuarios, autenticación
+│   │   ├── Models/
+│   │   │   ├── User.php
+│   │   │   └── Role.php
+│   │   ├── Actions/
+│   │   │   ├── RegisterUserAction.php
+│   │   │   ├── AssignRoleToBranchAction.php
+│   │   │   └── RequestDataForgetAction.php   # Derecho al olvido (Ley 21.719)
+│   │   ├── Policies/
+│   │   │   └── UserPrivacyPolicy.php
+│   │   └── Rules/
+│   │       └── UniqueRutPerCustomer.php
+│   │
+│   ├── Inventory/         # Catálogo y stock
+│   │   ├── Models/
+│   │   │   ├── Product.php
+│   │   │   ├── StockMovement.php
+│   │   │   ├── Branch.php
+│   │   │   └── Category.php
+│   │   ├── Actions/
+│   │   │   ├── AdjustStockAction.php
+│   │   │   ├── TransferStockAction.php
+│   │   │   └── CreateProductAction.php
+│   │   ├── Jobs/
+│   │   │   └── RecalculateStockCache.php
+│   │   └── DataTransferObjects/
+│   │       └── StockMovementDTO.php
+│   │
+│   ├── Sales/             # POS y pedidos
+│   │   ├── Models/
+│   │   │   ├── Sale.php
+│   │   │   ├── SaleItem.php
+│   │   │   ├── Customer.php
+│   │   │   └── Payment.php
+│   │   ├── Actions/
+│   │   │   ├── CreateSaleAction.php
+│   │   │   ├── VoidSaleAction.php
+│   │   │   └── AssignDeliveryRouteAction.php
+│   │   └── Enums/
+│   │       ├── SaleStatus.php
+│   │       └── PaymentMethod.php
+│   │
+│   ├── Sync/              # Sincronización WooCommerce
+│   │   ├── Models/
+│   │   │   ├── CanalWoo.php
+│   │   │   └── ProductWooMapping.php
+│   │   ├── Jobs/
+│   │   │   ├── SyncStockToWooCommerce.php
+│   │   │   ├── SyncProductToWooCommerce.php
+│   │   │   ├── SyncCustomerToWooCommerce.php
+│   │   │   ├── ProcessInboundWebhook.php
+│   │   │   └── ReconcileStock.php
+│   │   ├── Webhooks/
+│   │   │   ├── OrderCreatedHandler.php
+│   │   │   ├── OrderUpdatedHandler.php
+│   │   │   └── ProductUpdatedHandler.php
+│   │   ├── Clients/
+│   │   │   └── WooCommerceApiClient.php
+│   │   └── Rules/
+│   │       ├── FieldOwnershipResolver.php   # Estrategia B: bloqueo de campos
+│   │       └── TimestampConflictResolver.php # Estrategia A: timestamp
+│   │
+│   └── Reporting/         # Pre-agregación y reportes
+│       ├── Models/
+│       │   ├── DailySalesSummary.php
+│       │   └── StockSnapshot.php
+│       ├── Jobs/
+│       │   ├── AggregateDailySales.php
+│       │   └── SnapshotStock.php
+│       └── Actions/
+│           └── BuildCrossBranchReportAction.php
+│
+├── Http/
+│   ├── Controllers/       # Solo controllers "delgados": validan request, llaman Actions
+│   │   ├── PosController.php
+│   │   ├── ProductController.php
+│   │   ├── WebhookController.php
+│   │   └── ReportController.php
+│   └── Middleware/
+│       ├── CheckBranchAccess.php
+│       └── VerifyWebhookSignature.php
+│
+├── Services/              # Servicios transversales (no pertenecen a un dominio)
+│   ├── LicenseValidator.php      # Interfaz + stub
+│   └── RoleHierarchyService.php
+│
+└── Console/
+└── Commands/
+├── SyncReconcileStock.php
+├── AggregateDailyReports.php
+└── PurgeExpiredData.php     # Cumplimiento Ley 21.719
+Principios de la estructura
+Controllers delgados: Cada método de controlador valida la request, llama a una Action y retorna una respuesta. No contiene lógica de negocio.
+Actions con una sola responsabilidad: Cada Action ejecuta una tarea de dominio específica. Son invocables desde controllers, jobs o comandos.
+Jobs en el dominio que los origina: SyncStockToWooCommerce vive en Domain/Sync/Jobs/, no en app/Jobs/.
+Modelos auto-contenidos: Cada modelo incluye sus relaciones, scopes y atributos calculados. No hay repositorios externos que filtren consultas.
+Enums y DTOs tipifican el dominio: Los enums reemplazan strings mágicos. Los DTOs transportan datos entre capas sin acoplar a Eloquent.
+Beneficio para migraciones futuras
+Si el negocio crece y se decide extraer la sincronización a un microservicio independiente, el directorio app/Domain/Sync/ se copia a un nuevo proyecto Laravel con cambios mínimos. Las Actions y Jobs ya están encapsuladas; solo hay que reemplazar el WooCommerceApiClient por llamadas HTTP al nuevo servicio. El resto del sistema (Inventory, Sales, Identity) ni se entera del cambio.
+Consejo para el desarrollador: No te sientas obligado a crear todas las carpetas de una vez. Empieza con Domain/Sales para el POS y Domain/Inventory para el stock. A medida que el código crezca, extraé Domain/Sync y Domain/Reporting. La estructura debe evolucionar con el sistema, no definirse rígidamente el día cero.
+08 · Estructura y Operación Interna
+Reportería y Rendimiento
+Regla de oro: prohibido calcular reportes en tiempo real sobre tablas transaccionales. El rendimiento del POS es la prioridad máxima; la latencia en reportes es una decisión de diseño aceptada.
+Riesgo crítico: Una consulta SELECT SUM(quantity) FROM stock_ledger WHERE ... sobre 500k movimientos mientras un cajero intenta cobrar en el POS puede congelar la base de datos compartida de cPanel. La pre-agregación no es optativa: es obligatoria para la viabilidad del sistema en producción.
+Estrategia de pre-agregación
+En lugar de consultar las tablas transaccionales (stock_ledger, sales) para cada reporte, se ejecutan Jobs programados que consolidan los datos en tablas de resumen. Los reportes leen estas tablas pre-agregadas.
+Job: AggregateDailySales
+Se ejecuta cada 30-60 minutos. Agrupa las ventas del día por sucursal, método de pago y categoría de producto, y escribe los totales en daily_sales_summaries.
+// app/Domain/Reporting/Jobs/AggregateDailySales.php
+public function handle(): void
+{
+// 1. Obtener ventas del día actual que aún no han sido agregadas
+\$lastAggregation = DailySalesSummary::max('aggregated_until')
+?? now()->subDay();
+\$sales = Sale::where('created_at', '>', \$lastAggregation)
+->where('status', '!=', 'cancelled')
+->get();
+// 2. Agrupar por sucursal × método de pago × categoría
+\$groups = \$sales->groupBy(fn(\$s) => [
+'branch_id'    => \$s->branch_id,
+'payment_method' => \$s->payment_method,
+'date'         => \$s->created_at->toDateString(),
+]);
+// 3. Upsert masivo en tabla de resumen
+foreach (\$groups as \$key => \$group) {
+DailySalesSummary::upsert([
+'branch_id'      => \$group[0]->branch_id,
+'payment_method'  => \$group[0]->payment_method,
+'date'           => \$group[0]->created_at->toDateString(),
+'total_sales'    => \$group->count(),
+'total_revenue'  => \$group->sum('total'),
+'aggregated_until' => now(),
+], ['branch_id', 'payment_method', 'date']);
+}
+}
+Job: SnapshotStock
+Se ejecuta cada 15-30 minutos. Toma una foto del stock actual de cada producto por sucursal y la almacena en stock_snapshots. Esto permite consultar el stock histórico sin sumar el ledger completo.
+// app/Domain/Reporting/Jobs/SnapshotStock.php
+public function handle(): void
+{
+\$products = Product::with('branches')->get();
+\$snapshots = [];
+foreach (\$products as \$product) {
+foreach (\$product->branches as \$branch) {
+\$snapshots[] = [
+'product_id'     => \$product->id,
+'branch_id'      => \$branch->id,
+'stock_quantity' => \$product->stockEnSucursal(\$branch),
+'snapshot_at'    => now(),
+];
+}
+}
+StockSnapshot::insert(\$snapshots);  // insert masivo
+}
+Tablas de resumen
+Tabla
+Propósito
+Frecuencia
+daily_sales_summaries
+Ventas agregadas por sucursal, método de pago y fecha
+Cada 30-60 min
+stock_snapshots
+Foto del stock por producto × sucursal en un instante
+Cada 15-30 min
+branch_product_stock
+Stock actual denormalizado (actualizado por eventos de dominio)
+Tiempo real (eventos)
+monthly_sales_summaries
+Agregación mensual para reportes de cierre
+Diario (acumula)
+Configuración del cron para reportería
+# Reportes — ejecutar cada 30 minutos
+*/30 * * * * /usr/local/bin/php /home/user/public_html/artisan reports:aggregate-sales >> /dev/null 2>&1
+# Snapshots de stock — ejecutar cada 15 minutos
+*/15 * * * * /usr/local/bin/php /home/user/public_html/artisan stock:snapshot >> /dev/null 2>&1
+# Cierre diario (consolidación mensual) — ejecutar a las 23:45
+45 23 * * * /usr/local/bin/php /home/user/public_html/artisan reports:close-day >> /dev/null 2>&1
+Latencia como decisión de diseño
+El panel de reportes del MVP muestra datos con una latencia de hasta 60 minutos. Esto es intencional. El cajero no puede esperar a que una consulta pesada termine para completar una venta. El administrador que revisa reportes puede tolerar datos de "hace 30 minutos".
+Si en Fase 2 se requiere reportes en tiempo real, se implementa una capa de caché (Redis si el hosting lo soporta, o tabla denormalizada branch_product_stock) que se actualiza mediante eventos de dominio, no por consultas directas al ledger.
+Métrica de rendimiento objetivo: Toda transacción POS debe completarse en <500ms. Las consultas de reportes no deben degradar este tiempo. Si una consulta de reporte tarda 10 segundos pero no afecta al POS, es aceptable. Si una consulta de reporte hace que una transacción POS tarde 2 segundos, hay que corregirla.
+09 · Frontera del MVP y Backlog Fase 2
+Límites y Exclusiones del MVP
+Esta página define explícitamente qué funcionalidades están fuera del alcance de la primera versión entregable (MVP) y documenta su alcance conceptual para el desarrollo futuro. Ninguna de estas funcionalidades debe implementarse en la fase MVP.
+1. Pagos Integrados (Webpay POS / Transbank)
+Situación en el MVP: El POS registra los pagos de forma manual e informativa. El cajero selecciona "Efectivo", "Débito" o "Crédito" como método de pago, pero la integración con el terminal físico de Transbank no existe. El flujo de pago es: el cajero cobra en el POS, el sistema registra el método, y el cajero opera el terminal POS físico de forma independiente.
+Por qué no está en el MVP:
+Trámites comerciales: La integración con Transbank requiere un contrato comercial, certificación técnica (2-4 semanas) y, en algunos casos, un POS físico proporcionado por el banco. Esto no es un obstáculo técnico sino comercial y de tiempo.
+Bridge local: El SDK de Transbank es Java o .NET, no PHP. Se necesita un proceso externo (bridge Node.js o Java) que se comunique con el terminal por puerto serie o Bluetooth. Este bridge debe ejecutarse en la máquina del operador, no en el servidor, y orquestarlo desde Laravel requiere un canal de comunicación (WebSocket local o API HTTP en localhost).
+Multi-plataforma: El bridge sería específico del SO del operador (Windows .dll vs Linux .so), duplicando el esfuerzo de desarrollo y testing.
+Alcance conceptual para Fase 2:
+Evaluar Webpay API 2.0 (QR dinámico) que permite al cliente pagar desde su teléfono sin terminal POS físico, eliminando la necesidad del bridge.
+Si se requiere terminal físico, implementar un bridge Node.js con comunicación vía WebSocket (localhost) hacia el navegador del POS.
+La certificación Transbank corre por cuenta del cliente, no del desarrollador.
+2. Facturación Electrónica (DTE / SII)
+Situación en el MVP: El sistema emite un comprobante interno (ticket o comprobante no tributario) al finalizar cada venta. Este comprobante cumple como respaldo de la operación pero no tiene validez fiscal.
+Por qué no está en el MVP:
+Obligación legal vs complejidad técnica: Emitir DTE requiere integración con el SII (SOAP XML con firma electrónica) o con un proveedor autorizado (PayMe, LibreDTE, Haulmer). Cada proveedor tiene su propia API, modelo de datos y costos asociados.
+Decisión de proveedor pendiente: El cliente debe elegir el proveedor de facturación. No es una decisión técnica sino comercial. El desarrollador no debe forzar una elección en el MVP.
+Múltiples flujos: Boleta electrónica (sin RUT) vs factura electrónica (con RUT). Notas de crédito/débito. Cada flujo duplica la lógica de integración.
+Alcance conceptual para Fase 2:
+Integrar con un proveedor API REST (PayMe recomendado por SDK moderno y soporte local).
+El POS emite boleta/factura al momento del pago. WooCommerce emite DTE para pedidos web al confirmar despacho.
+Implementar tabla sales.dte_uuid para trackear el documento fiscal asociado a cada venta.
+La firma electrónica del cliente se almacena de forma segura en la configuración del sistema.
+Importante: La emisión de comprobantes no tributarios en el MVP es legal siempre que el cliente emita los DTE correspondientes por otro medio (ej. WooCommerce con plugin de facturación, o facturación manual). El POS no reemplaza la obligación fiscal del cliente; es responsabilidad de este último asegurar el cumplimiento tributario.
+3. Modo Offline (PWA / IndexedDB)
+Situación en el MVP: El POS requiere conexión continua al servidor (cPanel). Cada transacción se registra mediante Inertia.js hacia Laravel. Si la conexión se pierde, el POS deja de operar.
+Por qué no está en el MVP:
+Complejidad de sincronización bidireccional: Implementar un caché local (IndexedDB en el navegador) que almacene transacciones offline y las sincronice al reconectar requiere un motor de conflictos, detección de cambios, y lógica de reconciliación que duplica gran parte del backend en el frontend.
+Caché de catálogo: El navegador debe almacenar localmente el catálogo de productos, precios y stock. Para catálogos grandes (>5000 productos), esto implica manejar cuotas de almacenamiento, versionado de datos y actualización diferencial.
+Colisiones y consistencia: Dos cajeros offline en la misma sucursal podrían vender el mismo último producto. Resolver esa colisión post-reconexión es un problema de dominio que requiere una estrategia de "último en llegar pierde" o "reserva temporal".
+Alcance conceptual para Fase 3:
+Implementar Service Worker + IndexedDB como capa de persistencia local.
+Jobs de sincronización en el frontend que empujen transacciones acumuladas al servidor al recuperar la conexión.
+Estrategia de resolución: "primero en llegar, primero en servirse" con alerta al administrador sobre colisiones resueltas.
+El catálogo se cachea con versionado: cada producto tiene un version_id que el frontend compara para saber si necesita actualizar su copia local.
+Decisión consciente: El MVP sacrifica el modo offline para reducir la complejidad y acelerar la entrega. La mayoría de los comercios chilenos tienen conectividad estable en sus sucursales urbanas. El modo offline es una funcionalidad diferencial para clientes con sucursales en zonas rurales o con conectividad intermitente.
+4. Enrutamiento Geográfico (Modo C — Despacho)
+Situación en el MVP: Los pedidos web se asignan a sucursal mediante Modo A (sucursal fija del CanalWoo) o Modo B (selección manual por supervisor). No hay asignación automática por geolocalización.
+Por qué no está en el MVP: Ver sección 5.1 Rutas de Despacho. Requiere mantener una base de datos de comunas, tabla de cobertura por sucursal, lógica de excepción por falta de stock, y validación de direcciones. Es deseable pero no crítico para la operación inicial.
+Alcance conceptual para Fase 2:
+Tabla branch_coverage con (branch_id, comuna, activo, prioridad).
+Algoritmo de asignación: cobertura geográfica → disponibilidad de stock → costo de despacho → tiempo estimado.
+Fallback a Modo B si la asignación automática no encuentra candidata.
+API externa de geocodificación (Google Maps / OpenStreetMap) para validar direcciones.
+5. Integración con servicios de tracking (Chilexpress, Starken, Bluexpress)
+Situación en el MVP: No hay tracking externo. El estado de despacho se actualiza manualmente en el POS y se refleja en WooCommerce.
+Por qué no está en el MVP: Cada courier tiene su propia API de tracking con distintos formatos y requerimientos de autenticación. La integración es puramente operativa y no afecta la transaccionalidad del negocio.
+Alcance conceptual para Fase 2: Tabla shipping_providers con configuración de API por courier. Webhook receptor para actualizar estado automáticamente cuando el courier escanea el paquete.
+Resumen visual: MVP vs Fase 2
+Funcionalidad
+MVP
+Fase 2
+Fase 3
+POS con ventas, descuentos, múltiples pagos
+Sí
+—
+—
+Webpay presencial (terminal Transbank)
+No (manual)
+Bridge Node.js o API 2.0
+—
+Facturación DTE (SII/proveedor)
+No (comprobante interno)
+Integración PayMe
+—
+Modo Offline (PWA / IndexedDB)
+No (requiere conexión)
+—
+Arquitectura offline-first
+Enrutamiento geográfico de despachos
+No (Modo A o B)
+Algoritmo + cobertura
+—
+Tracking courier externo
+No (manual)
+API por proveedor
+—
+Reportes con datos en tiempo real
+No (latencia 30-60 min)
+Caché Redis + eventos
+—
+App móvil nativa
+No
+—
+PWA → Android/iOS
+10 · Guía de Frontend
+Frontend: Vue 3 + Inertia
+Directrices para construir la interfaz del sistema, con énfasis en el módulo de Caja (POS), que es la pantalla más crítica en términos de reactividad y experiencia de usuario.
+Manejo de Estado: regla de dos vías
+El sistema usa dos estrategias de estado mutuamente excluyentes según el contexto. Mezclarlas en el mismo componente es una mala práctica que debe evitarse:
+Contexto
+Estrategia
+Razón
+CRUDs administrativos (sucursales, usuarios, productos)
+Props de Inertia.js — sin estado global en el cliente
+Son operaciones que cargan datos, los muestran en tabla/formulario y los guardan en servidor. No requieren reactividad entre páginas ni persistencia local. Usar Pinia aquí es sobreingeniería.
+Carrito del POS (cart)
+Pinia store — con persistencia opcional vía pinia-plugin-persistedstate
+El carrito necesita: (a) reactividad fina para sumar totales al vuelo, (b) persistir si el usuario recarga la pestaña por error, y (c) no depender de viajes constantes al servidor hasta que se cierre la venta. Pinia resuelve todo esto de forma nativa.
+Implementación del store del carrito
+// stores/usePosCartStore.js
+import { defineStore } from 'pinia'
+import { useStorage } from '@vueuse/core'
+export const usePosCartStore = defineStore('pos-cart', {
+state: () => ({
+items: useStorage('pos-cart-items', []),    // persistido en localStorage
+currentSale: null,                           // datos de la venta en curso
+coupon: null,                                // descuento global si existe
+}),
+getters: {
+totalItems: (state) => state.items.reduce((sum, i) => sum + i.quantity, 0),
+subtotal:   (state) => state.items.reduce((sum, i) => sum + i.quantity * i.price, 0),
+total:      (state) => {
+const subtotal = state.items.reduce((s, i) => s + i.quantity * i.price, 0)
+return state.coupon ? subtotal * (1 - state.coupon.discount) : subtotal
+},
+},
+actions: {
+addProduct(product) { /* agregar o incrementar cantidad */ },
+removeItem(index)   { /* eliminar línea */ },
+updateQuantity(index, qty) { /* cambiar cantidad */ },
+clearCart()         { /* resetear carrito y limpiar storage */ },
+async checkout()    { /* llamar a Inertia.post(route('pos.store'), ...) */ },
+},
+})
+Regla estricta: El store de Pinia solo se usa para el carrito del POS. Cualquier otro estado global (usuario logueado, sucursal activa, preferencias) se obtiene de las props de Inertia o de la sesión de Laravel a través de usePage(). Si un desarrollador nuevo crea un store de Pinia para productos o sucursales, la PR debe rechazarse.
+Lectura de Código de Barras
+Las pistolas de código de barras USB se comportan como un teclado HID: emiten la secuencia de dígitos del código de barras seguida de un Enter. El POS debe capturar este input desde cualquier lugar de la pantalla, sin requerir que el cajero haga clic en un campo de búsqueda.
+Implementación del listener global
+// composables/useBarcodeScanner.js
+import { onMounted, onUnmounted } from 'vue'
+import { usePosCartStore } from '@/stores/usePosCartStore'
+export function useBarcodeScanner() {
+const store = usePosCartStore()
+let buffer = ''
+let lastKeyTime = 0
+function onKeyDown(e) {
+const now = Date.now()
+// Si pasó más de 100ms desde la última tecla, reiniciar buffer
+// (un escáner tipea sin pausas entre caracteres)
+if (now - lastKeyTime > 100 && e.key !== 'Enter') {
+buffer = ''
+}
+lastKeyTime = now
+if (e.key === 'Enter') {
+if (buffer.length >= 4) {  // mínimo razonable para un código de barras
+e.preventDefault()
+store.addProductByBarcode(buffer)
+}
+buffer = ''
+return
+}
+// Solo capturar dígitos y caracteres comunes en códigos de barras
+if (/^[A-Z0-9\-]$/i.test(e.key)) {
+buffer += e.key
+}
+}
+onMounted(()    => window.addEventListener('keydown', onKeyDown))
+onUnmounted(()  => window.removeEventListener('keydown', onKeyDown))
+}
+Criterios de diseño del listener:
+El umbral de 100ms entre teclas distingue un escáner (sin pausas) de un humano tipeando (con pausas). Si se detectan pausas mayores, el buffer se reinicia.
+No se necesita un input de búsqueda con foco permanente. El cajero puede estar seleccionando métodos de pago mientras escanea productos para la siguiente venta.
+Para escáneres que emiten un sufijo distinto a Enter (ej. Tab), se parametriza el SUFFIX_KEY en una variable de entorno del frontend.
+Arquitectura de componentes por dominio
+Los componentes se organizan por dominio funcional, no por tipo técnico. Esto evita que la carpeta components/ se convierta en un cajón de sastre con cientos de archivos sin relación.
+resources/js/
+├── Pages/                          # Páginas de Inertia (una por ruta)
+│   ├── POS/
+│   │   ├── Index.vue               # Página principal del POS
+│   │   ├── Cart.vue                # Carrito de compras
+│   │   └── Checkout.vue            # Pantalla de cobro
+│   ├── Inventory/
+│   │   ├── ProductList.vue
+│   │   ├── ProductForm.vue
+│   │   ├── StockAdjustment.vue
+│   │   └── Transfers.vue
+│   ├── Admin/
+│   │   ├── Branches/
+│   │   │   ├── Index.vue
+│   │   │   └── Form.vue
+│   │   ├── CanalWoo/
+│   │   │   ├── Index.vue
+│   │   │   └── Form.vue
+│   │   └── Users/
+│   │       ├── Index.vue
+│   │       └── Form.vue
+│   └── Reports/
+│       ├── SalesSummary.vue
+│       └── StockHistory.vue
+│
+├── Components/                     # Componentes reutilizables (solo si se usan en 2+ dominios)
+│   ├── Ui/
+│   │   ├── BaseButton.vue
+│   │   ├── BaseInput.vue
+│   │   ├── BaseModal.vue
+│   │   └── BaseTable.vue
+│   └── Partials/
+│       ├── SidebarNav.vue
+│       └── TopBar.vue
+│
+├── Composables/                    # Lógica reactiva reutilizable
+│   ├── useBarcodeScanner.js
+│   ├── usePosCart.js
+│   └── useBranchSession.js
+│
+├── stores/                         # Solo Pinia stores (una: pos-cart)
+│   └── usePosCartStore.js
+│
+├── Layouts/
+│   ├── AppLayout.vue               # Layout principal con sidebar y topbar
+│   └── PosLayout.vue               # Layout minimalista para pantalla de caja
+│
+└── app.js                          # Entry point (crea app Vue, registra Pinia)
+Nota: Los componentes en Components/Ui/ deben ser puramente visuales y no contener lógica de negocio. La lógica de dominio vive en las Pages/ y los Composables/. Esto permite reutilizar botones e inputs sin arrastrar dependencias del dominio.
+11 · Guía de Backend
+Motor de Colas y Cron
+El sistema no tiene demonios persistentes. Toda la ejecución diferida se apoya en dos pilares: el driver de colas database de Laravel y el programador de tareas (cron) de cPanel. Este patrón es obligatorio, no optativo.
+Restricción de infraestructura: cPanel no permite ejecutar php artisan queue:work como servicio (sin systemd, supervisor, screen/tmux). La combinación cron + DB queue es la única alternativa viable en hosting compartido.
+Pipeline de ejecución diferida
+Dispatch: El controlador (o Action) despacha un Job con dispatch()->onQueue('high'). La operación POS no espera a que el Job termine.
+Persistencia: El Job se almacena en la tabla jobs de MySQL (driver database). No hay Redis ni memoria volátil.
+Trigger: Cada minuto, el cron ejecuta php artisan queue:work --stop-when-empty. Este comando procesa todos los Jobs pendientes y luego termina.
+Ejecución: Los Jobs se procesan en orden de prioridad: high (stock), normal (productos, transferencias), low (clientes). Dentro de cada cola, FIFO.
+Finalización: Al vaciar la cola, el worker se detiene. No queda ningún proceso residente. El próximo minuto, el cron lo vuelve a iniciar.
+Reintentos y resiliencia
+Mecanismo
+Configuración
+Reintentos con backoff
+5 intentos: 30s, 2min, 5min, 15min, 30min
+Dead Letter Queue
+Jobs fallidos pasan a failed_jobs. Se recuperan con php artisan sync:retry-all
+Idempotencia
+UUID en header X-Idempotency-Key. WooCommerce lo almacena 24h para evitar duplicados
+Throttling
+Middleware throttle de Laravel HTTP Client + semáforo por CanalWoo (25 req/s)
+Jobs del sistema y su programación cron
+Job / Comando
+Frecuencia
+Cola
+SyncStockToWooCommerce
+Al descuadrar stock (evento)
+high
+SyncProductToWooCommerce
+Al crear/actualizar producto
+normal
+SyncTransferToWooCommerce
+Al completar transferencia
+normal
+SyncCustomerToWooCommerce
+Al crear/actualizar cliente
+low
+SyncPriceToWooCommerce
+Al cambiar precio
+normal
+php artisan sync:reconcile-stock
+03:00 AM (diario)
+— (comando directo)
+php artisan reports:aggregate-sales
+Cada 30-60 min
+— (comando directo)
+php artisan stock:snapshot
+Cada 15-30 min
+— (comando directo)
+php artisan reports:close-day
+23:45 (diario)
+— (comando directo)
+Entradas de cron en cPanel
+# Worker de cola — cada minuto
+* * * * * /usr/local/bin/php /home/user/public_html/artisan queue:work --stop-when-empty --queue=high,normal,low >> /dev/null 2>&1
+# Reconciliación diaria de stock — 03:00 AM
+0 3 * * * /usr/local/bin/php /home/user/public_html/artisan sync:reconcile-stock >> /dev/null 2>&1
+# Reportes — cada 30 minutos
+*/30 * * * * /usr/local/bin/php /home/user/public_html/artisan reports:aggregate-sales >> /dev/null 2>&1
+# Snapshots de stock — cada 15 minutos
+*/15 * * * * /usr/local/bin/php /home/user/public_html/artisan stock:snapshot >> /dev/null 2>&1
+# Cierre diario — 23:45
+45 23 * * * /usr/local/bin/php /home/user/public_html/artisan reports:close-day >> /dev/null 2>&1
+Latencia aceptada: La ventana de inconsistencia máxima del sistema es de ~1 minuto en condiciones normales (el intervalo del cron). Los reportes pueden tener hasta 60 min de rezago. Toda transacción POS se completa en <500ms porque nunca espera a WooCommerce.
+11 · Guía de Backend
+Servicios Transversales
+Componentes de infraestructura que no pertenecen a un dominio específico pero son necesarios para la operación del sistema. Se definen por contrato (interface) y se inyectan por binding en el contenedor de Laravel.
+LicenseValidator
+Propósito: Validar la licencia de la instalación. En el MVP siempre retorna activo para no bloquear al desarrollador ni al cliente durante la fase inicial.
+interface LicenseValidator {
+public function isValid(string $licenseKey): bool;
+public function getLicenseInfo(string $licenseKey): array;
+public function getDaysRemaining(string $licenseKey): ?int;
+}
+Implementación MVP (LocalLicenseStub):
+class LocalLicenseStub implements LicenseValidator {
+public function isValid(string $licenseKey): bool { return true; }
+public function getLicenseInfo(string $licenseKey): array {
+return [
+'status' => 'active',
+'plan'   => 'mvp-standalone',
+'source' => 'stub',
+];
+}
+public function getDaysRemaining(string $licenseKey): ?int { return 365; }
+}
+Reemplazo futuro: Solo se cambia el binding en AppServiceProvider para apuntar a un servicio cloud real. El dominio no conoce ni depende de la implementación concreta.
+// MVP:
+$this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
+// Futuro:
+// $this->app->bind(LicenseValidator::class, CloudLicenseService::class);
+RoleHierarchyService
+Propósito: Implementar la jerarquía acumulativa de roles (Cajero → Supervisor → Admin Central). Un rol puede ejecutar Gates definidos para roles inferiores sin necesidad de asignar múltiples roles al mismo usuario.
+class RoleHierarchyService {
+private array $hierarchy = [
+'cajero'        => 1,
+'supervisor'    => 2,
+'admin_central' => 3,
+];
+public function hasMinimumRole(User $user, string $requiredRole, ?Branch $branch = null): bool {
+$userLevel = $this->getUserLevel($user, $branch);
+$requiredLevel = $this->hierarchy[$requiredRole] ?? 0;
+return $userLevel >= $requiredLevel;
+}
+public function getUserLevel(User $user, ?Branch $branch): int {
+$roleName = $user->getRoleForBranch($branch);
+return $this->hierarchy[$roleName] ?? 0;
+}
+}
+WooCommerceApiClient
+Propósito: Cliente HTTP reutilizable para la API REST de WooCommerce. Encapsula autenticación (Consumer Key + Consumer Secret), throttling y manejo de errores. Vive en Domain/Sync/Clients/.
+Autenticación por CanalWoo: cada tienda tiene sus propias credenciales cifradas en la tabla tiendas.
+Throttling: middleware throttle de Laravel HTTP Client respetando 25 req/s por canal.
+Manejo de errores: lanza excepciones tipadas (WooCommerceConnectionException, WooCommerceAuthException, WooCommerceRateLimitException) para que los Jobs las capturen y reintenten según la política de backoff.
+Conflict Resolvers (Sync)
+Dos estrategias de resolución de conflictos para el catálogo, definidas en Domain/Sync/Rules/:
+Resolvedor
+Estrategia
+Ubicación
+TimestampConflictResolver
+Gana el updated_at más reciente. Simple pero vulnerable a skew de reloj (>5s).
+Domain/Sync/Rules/
+FieldOwnershipResolver
+Cada campo tiene dueño (sku, price → POS; description, images → WooCommerce). Nunca se sobreescribe un campo cuyo origen es el otro sistema.
+Domain/Sync/Rules/
+11 · Guía de Backend
+Middleware y Seguridad en Rutas
+Dos middleware protegen los puntos de entrada del sistema: uno valida que el usuario tenga permiso para operar en una sucursal específica, y otro verifica que los webhooks entrantes sean legítimos.
+CheckBranchAccess
+Propósito: Verificar que el usuario autenticado tenga el rol requerido en la sucursal activa de la sesión antes de ejecutar una acción. Se aplica a todas las rutas de negocio que dependen de una sucursal.
+class CheckBranchAccess {
+public function handle(Request $request, Closure $next, string $requiredRole): Response {
+$user = $request->user();
+$branch = $request->route('branch') ?? session('active_branch');
+if (!$user || !$branch) {
+abort(403, 'No hay sucursal activa.');
+}
+// El RoleHierarchyService valida jerarquía acumulativa
+if (!app(RoleHierarchyService::class)->hasMinimumRole($user, $requiredRole, $branch)) {
+abort(403, 'No tienes permiso en esta sucursal.');
+}
+// Vincular sucursal a la request para acciones posteriores
+$request->merge(['active_branch' => $branch]);
+return $next($request);
+}
+}
+Uso en rutas:
+Route::middleware(['auth', 'branch-access:supervisor'])->group(function () {
+Route::post('/stock/adjust', [StockController::class, 'adjust']);
+Route::post('/stock/transfer', [StockController::class, 'transfer']);
+});
+Route::middleware(['auth', 'branch-access:cajero'])->group(function () {
+Route::post('/pos/sale', [PosController::class, 'store']);
+});
+Los Gates del sistema complementan el middleware a nivel de autorización fina:
+Gate::define('pos-operate', fn(User $user, Branch $branch) =>
+$user->hasRoleInBranch(['cajero', 'supervisor', 'admin-central'], $branch)
+);
+Gate::define('void-sale', fn(User $user, Branch $branch) =>
+$user->hasRoleInBranch(['supervisor', 'admin-central'], $branch)
+);
+Gate::define('manage-woo-channels', fn(User $user) =>
+$user->hasRole('admin-central')
+);
+VerifyWebhookSignature
+Propósito: Validar que los webhooks entrantes de WooCommerce sean auténticos usando HMAC-SHA256 con un secreto compartido por CanalWoo. Sin esta verificación, cualquier agente externo podría enviar peticiones falsas a los endpoints del sistema.
+class VerifyWebhookSignature {
+public function handle(Request $request, Closure $next): Response {
+$signature = $request->header('X-WC-Webhook-Signature');
+$payload = $request->getContent();
+$canalWooId = $request->route('canal_woo');
+$canalWoo = CanalWoo::findOrFail($canalWooId);
+$expected = base64_encode(
+hash_hmac('sha256', $payload, decrypt($canalWoo->webhook_secret), true)
+);
+if (!hash_equals($expected, $signature)) {
+Log::warning('Webhook signature inválida', [
+'canal_woo_id' => $canalWooId,
+'ip' => $request->ip(),
+]);
+abort(401, 'Invalid webhook signature');
+}
+return $next($request);
+}
+}
+Endpoints protegidos:
+Endpoint
+Evento WooCommerce
+Acción
+POST /api/webhooks/order-created
+order.created
+Importar pedido como venta en estado en_transito
+POST /api/webhooks/order-updated
+order.updated
+Actualizar estado y notas del pedido
+POST /api/webhooks/product-updated
+product.updated
+Re-sincronizar campos propiedad de WooCommerce
+POST /api/webhooks/product-created
+product.created
+Importar producto como "no vinculado"
+POST /api/webhooks/stock-updated
+stock.updated
+Log de auditoría (no sobreescribe Stock Ledger)
+Procesamiento asíncrono: Todos los webhooks se procesan dentro de un Job encolado (ProcessInboundWebhook). El middleware solo valida la firma; la lógica de negocio se ejecuta en la cola para no bloquear la respuesta HTTP a WooCommerce.
+11 · Guía de Backend
+Mapa de Rutas del Sistema
+Inventario completo de todas las rutas del monolito Laravel. Al usar Inertia.js, el frontend y backend comparten el mismo origen; no existe una API REST interna. La comunicación es vía enrutamiento web clásico con sesiones seguras (Cookies + CSRF).
+Convenciones generales
+Aspecto
+Regla
+Archivo de rutas web
+routes/web.php — 95% del sistema (POS, administración, reportes). Requiere CSRF y autenticación de sesión.
+Archivo de rutas API
+routes/api.php — Exclusivo para webhooks entrantes (máquina-a-máquina). Sin CSRF, payloads JSON directos.
+Respuesta GET
+Inertia::render('ComponenteVue', ['datos' => ...])
+Respuesta POST/PUT/DELETE
+back()->with('success', '...') o redirect()->route(...). Inertia intercepta y actualiza el frontend sin recargar.
+Autorización
+Por rol (cajero < supervisor < admin_central) vía middleware CheckBranchAccess.
+Alcance sucursal
+Los controladores filtran datos según sucursales asignadas al usuario (tabla usuario_sucursal).
+1. Autenticación (Web)
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/login
+—
+Pública. Renderiza la vista Vue de Login. Si hay sesión, redirige al dashboard.
+POST
+/login
+email, password
+Pública. Valida credenciales, inicializa sesión y redirige al dashboard.
+POST
+/logout
+—
+Destruye la sesión, regenera CSRF y redirige a /login.
+2. Usuarios y Roles (Web)
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/usuarios
+busqueda, rol_id (Query)
+Renderiza listado (data table). Roles como props para filtros.
+GET
+/usuarios/crear
+—
+Renderiza formulario de creación.
+POST
+/usuarios
+nombre, email, password, rol_id, sucursales[]
+Crea usuario. Redirige a usuarios.index.
+GET
+/usuarios/{id}/editar
+—
+Renderiza formulario de edición.
+PUT
+/usuarios/{id}
+Mismos que POST (password opcional)
+Actualiza usuario. Retorna back()->with('success').
+PATCH
+/usuarios/{id}/estado
+activo (bool)
+Activa/desactiva la cuenta.
+DELETE
+/usuarios/{id}
+—
+Soft delete del usuario.
+3. Sucursales (Web — Resource CRUD)
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/sucursales
+—
+Renderiza listado de sucursales.
+POST
+/sucursales
+nombre, codigo, direccion, comuna
+Crea la sucursal.
+PUT
+/sucursales/{id}
+Mismos campos + requiere_control_caja (bool)
+Edita sucursal. Nota: si requiere_control_caja=false, la sucursal no exigirá apertura de sesión de caja para operar el POS.
+PATCH
+/sucursales/{id}/control-caja
+requiere_control_caja (bool)
+Cambia rápidamente el flag de control de caja sin enviar todo el formulario de la sucursal.
+DELETE
+/sucursales/{id}
+—
+Soft delete (bloqueado si hay historial).
+3.1 Estaciones POS (Web — CRUD)
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/estaciones-pos
+sucursal_id (Query)
+Renderiza listado de estaciones POS filtrable por sucursal.
+POST
+/estaciones-pos
+sucursal_id, nombre, codigo, activa
+Crea estación POS.
+PUT
+/estaciones-pos/{id}
+nombre, codigo, activa
+Edita estación POS. No permite cambiar de sucursal.
+DELETE
+/estaciones-pos/{id}
+—
+Soft delete. Las sesiones de caja históricas conservan la referencia.
+4. Tiendas WooCommerce y Sincronización (Web)
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/tiendas
+—
+Renderiza panel de integraciones WooCommerce.
+POST
+/tiendas
+url_base, consumer_key, consumer_secret, webhook_secret
+Guarda tienda con credenciales cifradas.
+PUT
+/tiendas/{id}
+Mismos campos
+Actualiza configuración de tienda.
+POST
+/tiendas/{id}/probar-conexion
+—
+HTTP request a WooCommerce desde el controlador. Retorna back()->with('status', 'OK'). Regla de negocio: debe verificar si el endpoint /products/brands existe en la API de Woo del cliente. Si da error 404 (versión antigua sin marcas), se debe deshabilitar la sincronización de marcas automáticamente para esa tienda sin bloquear la conexión general.
+POST
+/tiendas/{id}/sincronizar
+entidad
+Dispara Job de sincronización manual (catálogo/stock).
+4.1 Webhooks Entrantes (API — routes/api.php)
+Consumidos por WooCommerce. Sin CSRF. Validados por firma HMAC-SHA256. Responden HTTP 200 inmediato y procesan en Jobs.
+Verbo
+Ruta
+Body (JSON)
+Descripción
+POST
+/api/webhooks/woo/{tienda_id}/pedido-creado
+Payload nativo Woo
+Genera venta en estado en_transito.
+POST
+/api/webhooks/woo/{tienda_id}/pedido-actualizado
+Payload nativo Woo
+Actualiza estado del pedido.
+POST
+/api/webhooks/woo/{tienda_id}/producto-actualizado
+Payload nativo Woo
+Actualiza/Crea producto local según reglas de conflicto.
+4.2 Productos y Combos (Web — CRUD)
+CRUD estándar con vistas Inertia para productos y variantes. Los endpoints de componentes solo aplican si productos.tipo = 'combo'.
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/productos
+busqueda, categoria_id, tipo (Query)
+Renderiza listado de productos con filtros
+POST
+/productos
+nombre, tipo, categoria_id, activo
+Crea producto padre. Para tipo=combo crea automáticamente una variante default
+PUT
+/productos/{id}
+Mismos campos
+Actualiza producto padre
+DELETE
+/productos/{id}
+—
+Soft delete (bloqueado si hay movimiento de stock asociado)
+GET
+/productos/{id}/variantes
+—
+Renderiza listado de variantes del producto (vista Inertia con tabla Vue)
+POST
+/productos/{id}/variantes
+sku, precio_base, activa, descuenta_stock_por_componentes, sincronizable_web
+Crea variante. Para combos se deben registrar los componentes por separado
+GET
+/productos/{id}/componentes
+—
+Renderiza tabla de componentes del combo (solo si producto es combo)
+POST
+/productos/{id}/componentes
+componente_variante_id, cantidad, orden
+Agrega o actualiza componente del combo. Valida que el componente no sea el mismo combo ni forme un ciclo
+4.3 Etiquetas y Marcas (Web — CRUD)
+CRUD web para administrar etiquetas y marcas. Ambos se sincronizan con WooCommerce a través de sus tablas de mapeo respectivas (etiqueta_tienda_mapeo, marca_tienda_mapeo).
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/etiquetas
+busqueda (Query)
+Renderiza listado de etiquetas
+POST
+/etiquetas
+nombre, slug
+Crea etiqueta. El slug se genera automáticamente si no se envía
+PUT
+/etiquetas/{id}
+nombre, slug
+Actualiza etiqueta. Re-sincroniza con WooCommerce si ya tiene mapeos
+DELETE
+/etiquetas/{id}
+—
+Soft delete. Los mapeos WooCommerce se conservan para trazabilidad
+POST
+/etiquetas/{id}/mapeos
+tienda_id, woo_tag_id (opcional)
+Vincula manualmente la etiqueta local con un tag existente en WooCommerce. Si se omite woo_tag_id, el sistema crea el tag automáticamente y registra el ID
+GET
+/marcas
+busqueda (Query)
+Renderiza listado de marcas
+POST
+/marcas
+nombre, descripcion, logo_url
+Crea marca
+PUT
+/marcas/{id}
+nombre, descripcion, logo_url
+Actualiza marca. Re-sincroniza con WooCommerce si tiene mapeos
+DELETE
+/marcas/{id}
+—
+Soft delete. Los mapeos WooCommerce se conservan
+POST
+/marcas/{id}/mapeos
+tienda_id, woo_brand_id (opcional)
+Vincula manualmente la marca local con un brand de WooCommerce. Si se omite woo_brand_id, el sistema crea el brand automáticamente. Si /products/brands no existe en la tienda (WooCommerce antiguo), retorna error 400 y deshabilita la sincronización de marcas para esa tienda
+5. Catálogo y Stock (Web — CRUD)
+Patrón idéntico a Usuarios y Sucursales (CRUD web clásico con vistas Inertia). Operaciones clave de stock:
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/stock
+sucursal_id, busqueda (Query)
+Renderiza grilla de stock actual (stock_actual).
+GET
+/stock/movimientos
+fecha_desde, producto_id (Query)
+Renderiza vista del Ledger histórico (stock_movimientos).
+POST
+/stock/ajustes
+sucursal_id, producto_id, cantidad, comentario
+Crea ajuste manual dentro de una transacción DB.
+POST
+/stock/transferencias
+origen_id, destino_id, producto_id, cantidad
+Genera par de movimientos de traslado (origen −, destino +).
+6. Caja y Ventas (Web — POS)
+El carrito vive en memoria (Pinia). Al finalizar la venta se hace una sola llamada al servidor. El control de caja es opcional por sucursal (según flag requiere_control_caja).
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/pos
+—
+Renderiza interfaz principal del POS. Productos iniciales como props.
+POST
+/caja/abrir
+monto_inicial, estacion_pos_id (opcional)
+Abre sesión de caja del usuario actual. estacion_pos_id vincula la sesión a una estación POS específica. Si la sucursal tiene requiere_control_caja=0, el POS puede operar sin abrir sesión.
+POST
+/caja/cerrar
+montos_declarados[] ({ medio_pago, monto })
+Cierra sesión de caja. Recibe un array con el detalle por medio de pago. El backend genera los registros en caja_cierre_medios_pago, calcula monto_sistema vs monto_declarado y persiste la diferencia. Retorna resumen del arqueo (totales, descuadres).
+GET
+/caja/{id}
+—
+Renderiza vista detallada de la sesión de caja. Incluye: datos de apertura/cierre, desglose por medio de pago (desde caja_cierre_medios_pago) y listado completo de todas las ventas de esa sesión para facilitar el arqueo visual del supervisor.
+POST
+/ventas/preview
+items[] (carrito Pinia)
+Evalúa promociones activas sobre el carrito sin persistir nada. Retorna JSON con subtotales, descuentos aplicados y total final. Idempotente.
+POST
+/ventas
+items[], pagos[]
+Recibe carrito desde Pinia. Descuenta stock, registra pago, encola sync a WooCommerce. Retorna redirect con ID del comprobante.
+POST
+/ventas/{id}/confirmar-despacho
+sucursal_id
+Pasa pedido web de en_transito a completada. Actualiza inventario físico.
+7. Clientes (Web — CRUD + Privacidad)
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/clientes
+busqueda (Query)
+Renderiza listado de clientes.
+POST
+/clientes
+nombre, email, rut, telefono
+Crea cliente con cifrado de datos sensibles.
+PUT
+/clientes/{id}
+Mismos campos
+Actualiza cliente.
+POST
+/clientes/{id}/solicitudes-privacidad
+tipo_solicitud
+Registra trámite Ley 21.719 (ARCO+).
+POST
+/clientes/{id}/anonimizar
+—
+Ejecuta ofuscación de datos (derecho al olvido).
+8. Reportes (Web)
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/reportes/ventas
+fecha_desde, fecha_hasta (Query)
+Renderiza vista con datos desde resumen_ventas_diario.
+GET
+/reportes/exportar
+formato (csv | excel)
+Retorna BinaryFileResponse descargable.
+9. Licenciamiento
+9.1 Rutas de la instalación (Web + API)
+Verbo
+Ruta
+Contexto
+Descripción
+POST
+/licencia/verificar
+Web (Admin Vue)
+Forza validación contra stub (MVP) o API central (Fase 2). Retorna redirect con alerta.
+POST
+/api/webhooks/licencia
+API (routes/api.php)
+Recibe notificaciones push desde la API Central de Licencias. Sin CSRF, validado por firma criptográfica.
+9.2 Contrato de la API Central de Licenciamiento (Fase 2 — servicio externo)
+Estas rutas no se programan en el MVP. Se documentan para dejar preparado el cliente HTTP de Laravel con esta firma estructural. Base URL: https://licencias.tudominio.cl/api/v1
+Verbo
+Ruta
+Payload / Query
+Descripción
+POST
+/activaciones
+llave_instalacion, dominio
+Una vez al primer arranque. Empareja la instalación.
+POST
+/verificaciones
+llave_instalacion
+Chequeo periódico (cron). Retorna { estado: 'activo'|'suspendido' }.
+GET
+/instalaciones/{llave}
+—
+Consulta puntual para el panel de administración central.
+POST
+/instalaciones/{llave}/suspender
+motivo
+Ruta administrativa interna del servicio central. Corta el servicio al POS cliente.
+10. Promociones (Web — CRUD)
+CRUD web para administrar promociones y sus condiciones. La lógica de evaluación en tiempo real se ejecuta desde POST /ventas/preview y al confirmar la venta en POST /ventas.
+Verbo
+Ruta
+Body / Params
+Descripción
+GET
+/promociones
+activa, tipo, canal (Query)
+Renderiza listado de promociones con filtros y estado (activa / vencida / programada)
+POST
+/promociones
+nombre, tipo, valor, n_cantidad, m_cantidad, canal_aplicable, fecha_inicio, fecha_fin, activa
+Crea promoción. Los campos n_cantidad/m_cantidad solo aplican si tipo='nxm'
+PUT
+/promociones/{id}
+Mismos campos
+Actualiza promoción. Si ya hay ventas asociadas, la promoción original queda congelada en venta_detalle.promocion_id
+DELETE
+/promociones/{id}
+—
+Soft delete. Las ventas existentes conservan la referencia (SET NULL en venta_detalle)
+12 · Hoja de Ruta
+Hoja de Ruta (Paso a Paso)
+Secuencia lógica de construcción para un desarrollador solitario. Cada paso depende del anterior. No hay fechas ni estimaciones: solo dependencias y criterios de éxito.
+Cómo usar esta guía: Completá cada paso en orden. El "hito" de cada paso es la condición que debés verificar antes de avanzar al siguiente. Si el hito no se cumple, detenete y corregí antes de seguir.
+Paso 1: Fundaciones y Andamiaje
+Qué construir: El esqueleto del sistema. No hay lógica de negocio todavía, solo la infraestructura que la va a sostener.
+Crear proyecto Laravel 11 + Vue 3 + Inertia.js + Vite. Compilar y verificar que la página de bienvenida carga.
+Configurar Tailwind CSS y el layout base (AppLayout.vue con sidebar y topbar).
+Configurar la base de datos MySQL y verificar conexión desde Laravel.
+Diseñar y ejecutar las migraciones iniciales (ver diagrama ERD en sección 4.3): users, roles, sucursales, canal_woos, products, customers, sales, stock_ledger y tablas pivote.
+Implementar autenticación con Laravel Breeze + Inertia (Stack Vue).
+Implementar la matriz de roles con spatie/laravel-permission: seeders para Cajero, Supervisor y Admin Central.
+Crear el middleware CheckBranchAccess y el RoleHierarchyService.
+Hito: Poder loguearse con tres usuarios distintos (uno por rol) y ver el panel correspondiente con distintas opciones en la barra lateral según los permisos. Sin esto, no se puede avanzar.
+Por qué este orden: Si la autenticación y los roles no funcionan desde el día uno, cada feature nueva requerirá retrabajo para ajustar permisos. Es más barato validar la matriz con usuarios de prueba ahora que corregir 20 controladores después.
+Paso 2: Core Administrativo
+Qué construir: Los CRUD que gobiernan la configuración del sistema. No hay transacciones todavía, solo administración de entidades.
+CRUD de Sucursales: crear, editar, listar, eliminar sucursales. Configurar horarios y cobertura de despacho.
+CRUD de CanalWoo: crear tiendas WooCommerce conectadas con credenciales API cifradas. Asociar cada canal a una sucursal default.
+CRUD de Usuarios: crear usuarios y asignarles roles con ámbito de sucursal (un usuario puede ser Cajero en sucursal A y Supervisor en sucursal B).
+Implementar el stub de licencia (LocalLicenseStub) como se documenta en la sección 2.4. Verificar que el sistema no bloquee si la licencia "caduca" (siempre responde activo en MVP).
+Hito: Un Admin Central puede crear una sucursal, asociarle un CanalWoo, crear un usuario y asignarle un rol en esa sucursal. Todo persiste y se refleja al recargar.
+Por qué este orden: Antes de vender, el sistema necesita saber dónde se vende (sucursales), cómo se conecta con el mundo exterior (canales Woo) y quién opera (usuarios). Sin estas entidades configuradas, el POS no tiene contexto.
+Paso 3: El Motor de Inventario (Crítico)
+Qué construir: El catálogo de productos y el Stock Ledger. Este es el módulo más delicado del sistema porque de su correctitud depende la integridad del stock.
+CRUD de Categorías y Productos con variantes (talla/color) y precios multi-sucursal (tabla pivot branch_product).
+Importación/exportación CSV de productos para carga masiva inicial.
+Construir el Stock Ledger (tabla stock_ledger) con los 10 tipos de movimiento documentados en la sección 4.1.
+Implementar AdjustStockAction y TransferStockAction como transacciones de base de datos que escriben en el ledger y actualizan el saldo denormalizado (branch_product_stock) si existe.
+Escribir tests unitarios para el ledger: verificar que el saldo calculado (SUM) coincida con el saldo esperado después de secuencias de movimientos (entrada, venta, ajuste, transferencia).
+Hito: Poder registrar una entrada de stock manual, ver el saldo calculado correctamente, hacer una venta que descuente stock, y verificar que el ledger tenga trazabilidad completa (quién, qué, cuándo, por qué).
+Por qué este orden: El inventario es la fuente de verdad del negocio. Si el stock es incorrecto, el POS venderá productos sin existencias y la sincronización con WooCommerce propagará datos erróneos. Cada minuto invertido en tests del ledger ahora ahorra horas de soporte por reclamos de stock después.
+Paso 4: El Frontend del POS
+Qué construir: La interfaz de caja que el operador usará todo el día. Reactividad y velocidad son los requisitos no funcionales principales.
+Diseñar la UI de la caja con PosLayout.vue (layout minimalista: sin sidebar, solo una barra superior con datos de la sucursal y cajero).
+Implementar el carrito con Pinia (usePosCartStore) con las operaciones: agregar producto (por búsqueda o código de barras), cambiar cantidad, eliminar línea, calcular totales.
+Integrar el composable useBarcodeScanner para captura global de códigos de barras.
+Implementar el flujo de "Cobrar": seleccionar método de pago (efectivo, débito, crédito), registrar el pago de forma manual/informativa (sin Webpay), y cerrar la venta.
+Al cerrar la venta: (a) crear registro en sales, (b) descontar del Stock Ledger vía CreateSaleAction, (c) generar comprobante interno (vista HTML imprimible o PDF simple), (d) limpiar el carrito y dejar la caja lista para la siguiente venta.
+Hito: Un cajero puede abrir la caja, escanear/agregar productos, ver el total actualizarse al vuelo, cobrar, y recibir un comprobante. El stock se descuenta correctamente y se refleja en el ledger.
+Por qué este orden: El POS es la funcionalidad que el cliente ve y usa todos los días. Tenerlo funcionando rápido (aunque sea sin sincronización externa) permite hacer pruebas de usabilidad con usuarios reales y ajustar la UI antes de agregar la complejidad de la sincronización.
+Paso 5: Integración WooCommerce (Sincronización)
+Qué construir: Conectar el sistema con WooCommerce para que el catálogo, el stock y los pedidos web fluyan en ambos sentidos.
+Crear el cliente REST WooCommerceApiClient en Domain/Sync/Clients/ usando el HTTP Client de Laravel. Configurar autenticación con Consumer Key + Consumer Secret por CanalWoo.
+Implementar la estrategia de resolución de conflictos elegida (Estrategia A o B de la sección 3.1).
+Jobs de sincronización saliente: SyncProductToWooCommerce, SyncStockToWooCommerce, SyncCustomerToWooCommerce. Todos encolados con prioridad.
+Endpoint de webhook entrante: crear WebhookController con middleware VerifyWebhookSignature. Implementar handlers para order.created, order.updated, product.updated, product.created.
+Al recibir un nuevo pedido web (order.created): importar a la tabla sales con estado en_transito, descontar del Stock Ledger (movimiento venta_web), y dejar el pedido en el buzón de asignación de ruta de despacho.
+Implementar las Rutas de Despacho (Modo A y B documentados en sección 5.1).
+Hito: Un producto creado en el POS aparece en WooCommerce. Una venta POS descuenta stock en WooCommerce. Un pedido realizado en la tienda web aparece en el POS como venta en_transito y se puede asignar a una sucursal para despacho.
+Por qué este orden: La sincronización es el feature diferenciador del sistema, pero no tiene sentido until el POS funciona (Paso 4) y el inventario es correcto (Paso 3). Integrar WooCommerce antes de tener un POS sólido agregaría complejidad sin un sistema base contra el cual probar.
+Paso 6: Reportería, Reconciliación y Despliegue
+Qué construir: Los jobs de fondo que mantienen la salud del sistema y los reportes que el administrador usa para tomar decisiones.
+Crear los Jobs de pre-agregación: AggregateDailySales (cada 30-60 min) y SnapshotStock (cada 15-30 min). Ver sección 8.2 para la implementación.
+Crear el Job de reconciliación: SyncReconcileStock programado a las 3:00 AM (ver sección 3.3).
+Configurar las entradas de cron en cPanel para estos jobs.
+Construir las vistas de reportes: resumen de ventas del día, histórico de stock, productos con stock crítico.
+Pruebas de despliegue en entorno cPanel real: verificar que Inertia funciona con HTTPS, que los assets compilados se sirven correctamente, que el cron ejecuta los jobs, que no hay errores de permisos en storage/logs.
+Simular restricciones de cPanel: probar que la cola database procesa jobs sin Redis, que no hay timeouts de PHP para requests largas, que el .htaccess no bloquea las rutas de Inertia.
+Hito: El administrador puede ver un reporte de ventas del día anterior con latencia de hasta 60 minutos. La reconciliación nocturna no reporta discrepancias falsas. El sistema funciona en un hosting compartido real sin errores.
+Por qué este orden: Los reportes y la reconciliación cierran el círculo: permiten al negocio operar con datos consolidados y al desarrollador dormir tranquilo sabiendo que el stock se corrige automáticamente. Las pruebas en cPanel real son el paso final porque no tiene sentido deployar un sistema incompleto.
+Resumen de dependencias
+Paso 1 (Fundaciones)
+└──› Paso 2 (Admin) — depende de: auth + roles funcionando
+└──› Paso 3 (Inventario) — depende de: sucursales + usuarios creados
+└──› Paso 4 (POS) — depende de: catálogo + ledger correctos
+└──› Paso 5 (WooCommerce) — depende de: POS + inventario sólidos
+└──› Paso 6 (Reportes + Deploy) — depende de: todo lo anterior
+Consejo final: No saltees pasos. Cada paso produce un hito verificable. Si llegás al Paso 5 y encontrás un bug en el ledger del Paso 3, volvé atrás y corregilo antes de seguir. La deuda técnica en el inventario se paga con intereses compuestos.

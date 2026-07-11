@@ -38,15 +38,15 @@ El sistema corre en subdominio propio (ej. sistema.mi-tienda.cl) con su propia B
 1. Operación local inmediata (cada transacción POS se registra primero en BD local)
 2. Sincronización asíncrona (actualizaciones hacia WooCommerce encoladas)
 3. Reintentos automáticos con backoff exponencial
-4. Consistencia eventual (WooCommerce no es fuente de verdad; Stock Ledger del POS lo es)
+4. Consistencia eventual (WooCommerce no es source of truth; Stock Ledger del POS lo es)
 
 ### 1.7 Alcance MVP
 
 **Incluido:**
 - POS con venta, descuentos, múltiples medios de pago, impresión ticket
-- Catálogo de productos con variantes y precios multi-sucursal
+- Catálogo de Products con variantes y precios multi-sucursal
 - Inventario por sucursal con transferencias y ajustes
-- Sincronización WooCommerce bidireccional (stock, productos, pedidos)
+- Sincronización WooCommerce bidireccional (stock, products, pedidos)
 - Gestión de pedidos web y POS
 - Roles: Administrador, Supervisor, Vendedor, Bodeguero
 
@@ -102,7 +102,7 @@ Alternativa descartada (API stateless con Sanctum/Sanctum): requeriría tokens J
 
 ### 2.6 Diccionario de Datos (Esquema MariaDB)
 
-28 tablas del sistema documentadas en `index.html` (sección 2.5, título "Diccionario de Datos — Esquema MariaDB").
+28 Database tables documented in `index.html` (sección 2.5, título "Diccionario de Datos — Esquema MariaDB").
 
 **UI/UX aplicado:**
 - **Colapsable:** Cada tabla envuelta en `<details><summary>` — solo se ve el nombre + descripción corta por defecto; clic para expandir los campos.
@@ -110,9 +110,9 @@ Alternativa descartada (API stateless con Sanctum/Sanctum): requeriría tokens J
 - **Enlace al ERD:** Al final, link a `#inventario-erd` para la representación visual de las relaciones.
 - CSS de `details`/`summary` agregado a `styles.css` (bordes redondeados, hover, transiciones).
 
-**Grupos:** Configuración (configuracion_sistema, licencia_estado), Organización (sucursales, roles, usuarios, usuario_sucursal), Canales (tiendas), Catálogo (categorias, categoria_tienda_mapeo, atributos, valores_atributo, productos, producto_variantes, producto_variante_valores, producto_tienda_mapeo), Stock (stock_movimientos, stock_actual), Caja (sesiones_caja), Clientes (clientes, cliente_tienda_mapeo, clientes_solicitudes_privacidad), Ventas (ventas, venta_detalle, venta_pagos), Sync (sync_eventos), Auditoría (auditoria_accesos), Reportes (resumen_ventas_diario, resumen_stock_diario).
+**Grupos:** Configuración (system_configs, license_states), Organización (branches, roles, users, branch_user), Canales (stores), Catálogo (categories, category_store_mappings, attributes, attribute_values, products, product_variants, product_variant_values, product_store_mappings), Stock (stock_movements, current_stock), Caja (cash_sessions), Clientes (customers, customer_store_mappings, customer_privacy_requests), Ventas (sales, sale_items, sale_payments), Sync (sync_events), Auditoría (access_logs), Reportes (daily_sales_summaries, daily_stock_summaries).
 
-FK con RESTRICT priorizado. Índices compuestos críticos en stock_movimientos y ventas. stock_actual se recalcula incrementalmente.
+FK con RESTRICT priorizado. Índices compuestos críticos en stock_movements y sales. current_stock se recalcula incrementalmente.
 
 ### 2.7 Contrato de Licenciamiento
 
@@ -150,11 +150,11 @@ $this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
 
 ### 3.1 Reglas de Verdad
 - **Stock:** Bidireccional con jerarquía POS. El POS siempre impone su valor sobre WooCommerce. WooCommerce descuenta para pedidos web, el POS descuenta para ventas presenciales. Ajustes solo desde POS.
-- **Catálogo (productos):** Bidireccional con resolución de conflictos. Dos estrategias documentadas:
+- **Catálogo (Products):** Bidireccional con resolución de conflictos. Dos estrategias documentadas:
   - *Estrategia A — "Gana el timestamp más reciente":* Simple, compara updated_at. Vulnerable a skew de reloj (>5s).
   - *Estrategia B — "Bloqueo de campos según origen":* Cada campo tiene dueño definido (sku, price → POS; description, images → WooCommerce). Más robusta pero requiere configuración explícita.
 - **Pedidos web:** WooCommerce → POS (unidireccional). Una vez importados no se modifican retroactivamente.
-- **Clientes:** Bidireccional con última escritura gana.
+- **Customers:** Bidireccional con última escritura gana.
 - **Imágenes:** WooCommerce → POS (referencia por URL).
 
 ### 3.2 Fuentes de Verdad
@@ -165,7 +165,7 @@ $this->app->bind(LicenseValidator::class, LocalLicenseStub::class);
 | Catálogo — SKU, nombre, precio | POS | POS → WooCommerce (según estrategia) |
 | Catálogo — descripción, imágenes, categorías | WooCommerce | WooCommerce → POS (según estrategia) |
 | Pedidos web | WooCommerce | WooCommerce → POS (unidireccional) |
-| Clientes | POS | Bidireccional |
+| Customers | POS | Bidireccional |
 | Precios por sucursal | POS | POS → WooCommerce |
 
 ### 3.3 Webhooks Entrantes
@@ -196,7 +196,7 @@ Job programado (`php artisan sync:reconcile-stock`) que cruza el stock total del
 - Dead Letter Queue: failed_jobs con `php artisan sync:retry-all`
 - Idempotencia: UUID en X-Idempotency-Key (WooCommerce lo almacena 24h)
 - Throttling: middleware throttle de Laravel HTTP Client + semáforo por CanalWoo
-- Colas por prioridad: high (stock), normal (productos), low (clientes)
+- Colas por prioridad: high (stock), normal (products), low (customers)
 
 ---
 
@@ -229,23 +229,23 @@ Principios: inmutabilidad, auditabilidad, trazabilidad. Prohibido usar campo de 
 
 ### 4.2 Sucursales y Canales Web
 
-**Sucursal (branches):** Entidad con datos de contacto, horario (JSON), config POS, usuarios (N:M con roles por sucursal), precios propios (vía pivot branch_product), stock segregado, cobertura de despacho.
+**Branch (branches):** Entidad con datos de contacto, horario (JSON), config POS, usuarios (N:M con roles por sucursal), precios propios (vía pivot branch_product), stock segregado, cobertura de despacho.
 
 **CanalWoo:** Representa una tienda WooCommerce conectada. Cada canal tiene sus propias credenciales API y webhook secret. Un cliente puede tener múltiples canales (retail, B2B, etc.).
 
-- `canal_woos`: id, branch_id (FK), nombre, url, api_key (encrypted), api_secret (encrypted), webhook_secret (encrypted), activo, config (JSON)
-- `product_woo_mappings`: (product_id, canal_woo_id) → woo_id, woo_sku. Unique por par. Cada producto tiene un ID remoto distinto por canal.
+- `stores`: id, branch_id (FK), nombre, url, api_key (encrypted), api_secret (encrypted), webhook_secret (encrypted), activo, config (JSON)
+- `product_store_mappings`: (product_id, store_id) → woo_id, woo_sku. Unique por par. Cada producto tiene un ID remoto distinto por canal.
 
 **Transferencias:** proceso de 2 pasos: transfer_out (origen, -stock), transfer_in (destino, +stock).
 
 **Reglas:**
-- Producto sin stock aparece en catálogo como no disponible
+- Product sin stock aparece en catálogo como no disponible
 - Precios por sucursal opcionales (fallback a precio base)
-- Usuario con roles diferentes por sucursal
+- User con roles diferentes por sucursal
 - Stock global solo para reportes
 
 ### 4.3 Diagrama Entidad-Relación
-Diagrama SVG embebido en `index.html` (sección 4.3). Entidades: User, Role, Sucursal, CanalWoo, Product, Customer, Sale, StockMovement. Pivots: branch_product, product_woo_mappings. Relaciones N:M entre User-Role y User-Sucursal. 1:N: Sucursal→CanalWoo, Sucursal→Sale, Product→StockMovement, Customer→Sale.
+Diagrama SVG embebido en `index.html` (sección 4.3). Entidades: User, Role, Branch, CanalWoo, Product, Customer, Sale, StockMovement. Pivots: branch_product, product_store_mappings. Relaciones N:M entre User-Role y User-Branch. 1:N: Branch→CanalWoo, Branch→Sale, Product→StockMovement, Customer→Sale.
 
 ---
 
@@ -274,7 +274,7 @@ Tres modos de asignación de pedidos web a sucursal:
 
 **Derecho al olvido:** Endpoint que verifica obligaciones legales (facturas con DTE → retención 5 años). Si hay obligaciones: anonimización (reemplazar datos por valores irreversibles). Si no: eliminación completa + anonimización de referencias en ventas históricas. Todo auditado.
 
-**Rectificación:** Cliente actualiza datos desde su perfil. Cada cambio se registra en `customer_data_changes` (valor anterior, nuevo, fecha, IP) para reconstrucción de historial.
+**Rectificación:** Customer actualiza datos desde su perfil. Cada cambio se registra en `customer_data_changes` (valor anterior, nuevo, fecha, IP) para reconstrucción de historial.
 
 **Retención:** Configurable. Purga automática tras 5 años sin actividad.
 
@@ -284,9 +284,9 @@ Roles acumulativos (cada uno hereda del anterior):
 
 | Rol | Ámbito | Permisos clave |
 |-----|--------|---------------|
-| **Cajero** | Su sucursal | POS (vender, abrir/cerrar caja, ticket), ver stock (lectura), registrar clientes, historial propio |
+| **Cajero** | Su sucursal | POS (vender, abrir/cerrar caja, ticket), ver stock (lectura), registrar customers, historial propio |
 | **Supervisor** | Su sucursal | Todo Cajero + anular ventas, transferencias stock, asignar pedidos web (Modo B), ajustes inventario, reportes sucursal |
-| **Admin Central** | Global | Todo Supervisor (cualquier sucursal) + CRUD productos/sucursales/usuarios/canales Woo, configurar WooCommerce, reportes consolidados, licencias, auditoría |
+| **Admin Central** | Global | Todo Supervisor (cualquier sucursal) + CRUD products/branches/users/Woo channels, configurar WooCommerce, reportes consolidados, licencias, auditoría |
 
 **Implementación:** spatie/laravel-permission con pivot table `model_branch_roles` (user_id, role_id, branch_id). Middleware `CheckBranchAccess`. Roles globales con branch_id=null. RoleHierarchyService para jerarquía acumulativa.
 
@@ -335,13 +335,13 @@ Se rechaza la estructura MVC plana en favor de `app/Domain/<Nombre>/` con Models
 Regla de oro: prohibido calcular reportes en tiempo real sobre tablas transaccionales. Jobs programados consolidan datos en tablas de resumen.
 
 **Jobs:**
-- `AggregateDailySales`: Cada 30-60 min, agrupa ventas por sucursal × método de pago × fecha → `daily_sales_summaries`
-- `SnapshotStock`: Cada 15-30 min, foto del stock por producto × sucursal → `stock_snapshots`
+- `AggregateDailySales`: Cada 30-60 min, agrupa sales por sucursal × método de pago × fecha → `daily_sales_summaries`
+- `SnapshotStock`: Cada 15-30 min, foto del stock por product × sucursal → `stock_snapshots`
 
 **Tablas de resumen:**
 | Tabla | Propósito | Frecuencia |
 |-------|-----------|------------|
-| daily_sales_summaries | Ventas agregadas | 30-60 min |
+| daily_sales_summaries | Sales aggregated | 30-60 min |
 | stock_snapshots | Foto de stock | 15-30 min |
 | branch_product_stock | Stock actual denormalizado | Tiempo real (eventos) |
 | monthly_sales_summaries | Agregación mensual | Diario |
@@ -391,7 +391,7 @@ El diagrama de topología está embebido en `index.html` (sección 2.3) y muestr
 | Término | Definición |
 |---------|-----------|
 | Stock Ledger | Registro inmutable de movimientos de inventario |
-| Sucursal | Entidad con inventario, precios y usuarios propios |
+| Branch | Entidad con inventario, precios y usuarios propios |
 | CanalWoo | Representación de una tienda WooCommerce conectada (credenciales API, webhook secret) |
 | Local-First | El sistema opera principalmente con datos locales; la sincronización es secundaria |
 | Consistencia eventual | El estado externo (WooCommerce) converge al real con rezago controlado |
@@ -470,9 +470,9 @@ Secuencia lógica de 6 pasos. No hay fechas ni estimaciones. Cada paso tiene un 
 | Paso | Nombre | Depende de | Hito |
 |------|--------|-----------|------|
 | 1 | Fundaciones (Laravel+Vue+Inertia, DB, Auth, Roles) | — | Login con 3 roles funcionales |
-| 2 | Core Admin (CRUD Sucursales, CanalWoo, Usuarios, Licencia) | Paso 1 | Admin crea sucursal, canal y usuario |
+| 2 | Core Admin (CRUD Branches, CanalWoo, Users, Licencia) | Paso 1 | Admin crea branch, canal y user |
 | 3 | Motor Inventario (Catálogo, Stock Ledger, 10 tipos movimiento) | Paso 2 | Ledger con trazabilidad correcta |
-| 4 | Frontend POS (Carrito Pinia, Barcode, Cobrar, Comprobante) | Paso 3 | Venta completa descuenta stock |
+| 4 | Frontend POS (Carrito Pinia, Barcode, Cobrar, Comprobante) | Paso 3 | Sale completa descuenta stock |
 | 5 | Integración WooCommerce (REST, Webhooks, Despachos) | Paso 4 | Sync bidireccional funcional |
 | 6 | Reportería + Reconciliación + Deploy cPanel | Pasos 1-5 | Sistema operando en hosting real |
 
